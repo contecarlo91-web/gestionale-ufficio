@@ -3,38 +3,48 @@
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>UFF-MANAGER v0.9 - Full Cloud</title>
+    <title>UFF-MANAGER v1.0 - Full Cloud Operational</title>
     <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-firestore-compat.js"></script>
     <style>
-        :root { --bg:#0f172a; --panel:#111827; --text:#e5e7eb; --primary:#3b82f6; --border:#334155; --card:#1e293b; --danger:#ef4444; }
-        body { margin:0; font-family:sans-serif; background:var(--bg); color:var(--text); display:flex; height:100vh; overflow:hidden; }
-        aside { width:260px; background:var(--panel); border-right:1px solid var(--border); display:flex; flex-direction:column; }
-        main { flex:1; display:flex; flex-direction:column; background:#0b1224; }
-        .nav-item { padding:15px; cursor:pointer; border:none; background:none; color:#9ca3af; text-align:left; width:100%; transition:0.2s; border-left: 3px solid transparent; }
-        .nav-item:hover, .nav-item.active { color:white; background:rgba(59,130,246,0.1); border-left-color: var(--primary); }
-        #loginOverlay { position:fixed; inset:0; background:rgba(0,0,0,0.9); z-index:999; display:flex; align-items:center; justify-content:center; backdrop-filter:blur(10px); }
-        .login-box { background:var(--panel); padding:30px; border-radius:15px; border:1px solid var(--border); width:350px; text-align:center; }
-        input, select, textarea, button { width:100%; padding:10px; margin-top:10px; border-radius:8px; border:1px solid var(--border); background:var(--bg); color:white; font-size: 14px; }
-        button.primary { background:var(--primary); border:none; cursor:pointer; font-weight:bold; }
-        .content { padding:20px; flex:1; overflow-y:auto; }
+        :root {
+            --bg:#0f172a; --panel:#111827; --muted:#1f2937; --text:#e5e7eb;
+            --text-dim:#9ca3af; --primary:#3b82f6; --danger:#ef4444;
+            --warning:#f59e0b; --success:#10b981; --card:#0b1220; --border:#334155;
+        }
+        body { margin:0; font-family: system-ui, sans-serif; background:var(--bg); color:var(--text); display:flex; height:100vh; overflow:hidden; }
+        aside { width:260px; background:var(--panel); border-right:1px solid var(--border); display:flex; flex-direction:column; z-index:10; }
+        main { flex:1; display:flex; flex-direction:column; overflow:hidden; position:relative; }
+        .sidebar-header { padding:20px; font-weight:bold; color:var(--primary); border-bottom:1px solid var(--border); font-size:1.2rem; }
+        nav { flex:1; padding:12px; display:flex; flex-direction:column; gap:5px; }
+        .nav-item { padding:10px 12px; cursor:pointer; border-radius:10px; color:var(--text-dim); border:none; background:none; text-align:left; transition:0.2s; }
+        .nav-item:hover, .nav-item.active { background:rgba(59,130,246,0.1); color:white; }
+        .top-bar { height:60px; border-bottom:1px solid var(--border); display:flex; align-items:center; justify-content:space-between; padding:0 20px; background:var(--panel); }
+        .content { flex:1; overflow-y:auto; padding:20px; }
         
-        /* Tabelle e Kanban */
-        table { width:100%; border-collapse:collapse; background:var(--panel); border-radius:10px; overflow:hidden; }
-        th, td { padding:12px; text-align:left; border-bottom:1px solid var(--border); font-size: 13px; }
-        th { background:rgba(255,255,255,0.05); color:var(--primary); text-transform:uppercase; }
-        .kanban-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap:15px; }
-        .kanban-col { background: rgba(255,255,255,0.03); padding:10px; border-radius:10px; min-height: 400px; }
-        .task-card { background: var(--card); padding:12px; border-radius:8px; border:1px solid var(--border); margin-bottom:10px; cursor:grab; }
-        .badge { display:inline-block; padding:2px 8px; border-radius:4px; font-size:10px; font-weight:bold; background: var(--primary); }
+        /* Login Overlay */
+        #loginOverlay { position:fixed; inset:0; background:rgba(0,0,0,0.95); backdrop-filter:blur(10px); display:flex; align-items:center; justify-content:center; z-index:9999; }
+        .login-box { background:var(--panel); padding:40px; border-radius:20px; border:1px solid var(--border); width:400px; text-align:center; box-shadow:0 25px 50px -12px rgba(0,0,0,0.5); }
+        input, select, button { width:100%; padding:12px; border-radius:10px; border:1px solid var(--border); background:var(--bg); color:white; margin-top:10px; }
+        button.primary { background:var(--primary); border:none; font-weight:bold; cursor:pointer; }
+        
+        /* Kanban & Tables */
+        .kanban-grid { display:grid; grid-template-columns:repeat(4, 1fr); gap:20px; min-width:1000px; }
+        .kanban-col { background:rgba(255,255,255,0.02); border-radius:12px; padding:15px; min-height:500px; border:1px solid var(--border); }
+        .task-card { background:var(--card); padding:15px; border-radius:10px; border:1px solid var(--border); margin-bottom:12px; }
+        table { width:100%; border-collapse:collapse; background:var(--panel); border-radius:12px; overflow:hidden; }
+        th, td { padding:12px; text-align:left; border-bottom:1px solid var(--border); font-size:14px; }
+        th { background:rgba(255,255,255,0.05); color:var(--primary); }
+        .badge { padding:2px 8px; border-radius:6px; font-size:11px; font-weight:bold; background:var(--muted); }
     </style>
 </head>
 <body>
 
 <div id="loginOverlay">
     <div class="login-box">
-        <h2>Accesso Gestionale</h2>
-        <input type="text" id="loginName" placeholder="Tuo Nome (es. Mauro Ghezzi)">
+        <h2 style="margin:0 0 10px 0">Gestionale Ufficio Cloud</h2>
+        <p style="color:var(--text-dim)">Inserisci le tue credenziali</p>
+        <input type="text" id="loginName" placeholder="Nome (es. Mauro Ghezzi)">
         <select id="loginSection">
             <option value="Capo Ufficio">Capo Ufficio</option>
             <option value="Droni">Droni</option>
@@ -42,28 +52,126 @@
             <option value="Ala Fissa">Ala Fissa</option>
             <option value="Armamento">Armamento</option>
         </select>
-        <button id="loginBtn" class="primary">Entra nel Sistema</button>
+        <button id="loginBtn" class="primary">ACCEDI AL SISTEMA</button>
     </div>
 </div>
 
 <aside>
-    <div style="padding:20px; font-weight:bold; color:var(--primary); font-size:1.1rem;">UFF-MANAGER v0.9</div>
+    <div class="sidebar-header">UFF-MANAGER v1.0</div>
     <nav>
         <button class="nav-item active" onclick="switchView('registro')">📑 Registro Smarcamento</button>
         <button class="nav-item" onclick="switchView('tasks')">🗂 Task (Kanban)</button>
-        <button class="nav-item" onclick="switchView('note')">📝 Appunti & Note</button>
+        <button class="nav-item" onclick="switchView('note')">📝 Note Condivise</button>
         <button class="nav-item" onclick="switchView('appuntamenti')">📅 Appuntamenti</button>
     </nav>
-    <div style="margin-top:auto; padding:20px; border-top:1px solid var(--border)">
-        <div id="userInfoDisplay" style="font-size:11px; margin-bottom:10px; color:#9ca3af"></div>
-        <button onclick="location.reload()" style="background:var(--danger); border:none; padding:8px; font-size:11px; cursor:pointer; color:white">ESCI / CAMBIA UTENTE</button>
+    <div style="padding:20px; border-top:1px solid var(--border)">
+        <div id="userLabel" style="font-size:12px; color:var(--text-dim); margin-bottom:10px"></div>
+        <button onclick="location.reload()" style="background:var(--danger); border:none; padding:8px; width:100%; border-radius:5px; color:white; cursor:pointer">LOGOUT</button>
     </div>
 </aside>
 
 <main>
-    <div style="height:60px; border-bottom:1px solid var(--border); display:flex; align-items:center; justify-content:space-between; padding:0 20px;">
+    <div class="top-bar">
         <div id="viewTitle" style="font-weight:bold; text-transform:uppercase">REGISTRO SMARCAMENTO</div>
-        <button id="actionBtn" class="primary" style="width:auto; margin:0; padding:8px 20px">+ AGGIUNGI</button>
+        <button id="addBtn" class="primary" style="width:auto; margin:0; padding:8px 20px">+ AGGIUNGI NUOVO</button>
     </div>
     <div class="content" id="mainContent"></div>
 </main>
+
+<script>
+const firebaseConfig = {
+    apiKey: "AIzaSyCxLfCQ8igfytfdMuiJIN6uSZq2fcY0xuQ",
+    authDomain: "task-ufficio.firebaseapp.com",
+    projectId: "task-ufficio",
+    storageBucket: "task-ufficio.firebasestorage.app",
+    messagingSenderId: "435367581032",
+    appId: "1:435367581032:web:d77014469b570c9e9672dd"
+};
+
+firebase.initializeApp(firebaseConfig);
+const db = firebase.firestore();
+
+let user = null;
+let currentView = 'registro';
+let store = { registro: [], tasks: [], note: [], appuntamenti: [] };
+
+// LOGIN
+document.getElementById('loginBtn').onclick = async () => {
+    const name = document.getElementById('loginName').value.trim();
+    const section = document.getElementById('loginSection').value;
+    if(!name) return alert("Inserisci il nome!");
+
+    user = { name, section };
+    document.getElementById('loginOverlay').style.display = 'none';
+    document.getElementById('userLabel').innerHTML = `Utente: <b>${name}</b><br>Sezione: <b>${section}</b>`;
+    
+    // Attiva sincronizzazione Cloud
+    ['registro', 'tasks', 'note', 'appuntamenti'].forEach(col => {
+        db.collection(col).orderBy("timestamp", "desc").onSnapshot(snap => {
+            store[col] = snap.docs.map(doc => ({id: doc.id, ...doc.data()}));
+            render();
+        });
+    });
+};
+
+function switchView(v) {
+    currentView = v;
+    document.getElementById('viewTitle').innerText = v.replace('_',' ');
+    document.querySelectorAll('.nav-item').forEach(btn => btn.classList.toggle('active', btn.getAttribute('onclick').includes(v)));
+    render();
+}
+
+// AGGIUNTA DATI (Firebase Write)
+document.getElementById('addBtn').onclick = async () => {
+    const val = prompt(`Inserisci nuovo elemento per ${currentView}:`);
+    if(!val) return;
+
+    const payload = {
+        title: val,
+        author: user.name,
+        section: user.section,
+        timestamp: new Date().toISOString(),
+        status: "da_fare"
+    };
+
+    await db.collection(currentView).add(payload);
+};
+
+function render() {
+    const out = document.getElementById('mainContent');
+    out.innerHTML = "";
+
+    if(currentView === 'registro') {
+        let h = `<table><thead><tr><th>Data</th><th>Attività</th><th>Reparto</th><th>Firma</th><th>Azioni</th></tr></thead><tbody>`;
+        store.registro.forEach(i => {
+            h += `<tr><td>${new Date(i.timestamp).toLocaleDateString()}</td><td><b>${i.title}</b></td><td><span class="badge">${i.section}</span></td><td>${i.author}</td>
+            <td><button onclick="del('registro','${i.id}')" style="background:none; border:none; color:red; cursor:pointer">🗑</button></td></tr>`;
+        });
+        out.innerHTML = h + "</tbody></table>";
+    }
+
+    if(currentView === 'tasks') {
+        const columns = ["da_fare", "in_corso", "visione_cu", "completato"];
+        let h = `<div class="kanban-grid">`;
+        columns.forEach(col => {
+            h += `<div class="kanban-col"><h4 style="text-align:center; color:var(--primary)">${col.toUpperCase()}</h4>`;
+            store.tasks.filter(t => t.status === col).forEach(t => {
+                h += `<div class="task-card">
+                    <div style="font-size:10px; margin-bottom:5px">${t.section}</div>
+                    <div style="font-weight:bold">${t.title}</div>
+                    <select onchange="updTask('${t.id}', this.value)" style="font-size:10px; margin-top:10px">
+                        ${columns.map(c => `<option value="${c}" ${t.status === c ? 'selected' : ''}>${c}</option>`).join('')}
+                    </select>
+                </div>`;
+            });
+            h += `</div>`;
+        });
+        out.innerHTML = h + "</div>";
+    }
+}
+
+async function del(c, id) { if(confirm("Eliminare?")) await db.collection(c).doc(id).delete(); }
+async function updTask(id, s) { await db.collection("tasks").doc(id).update({ status: s }); }
+</script>
+</body>
+</html>
