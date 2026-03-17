@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Task Manager Ufficio v0.5 - Full Cloud</title>
+<title>Task Manager Ufficio v0.6 - Cloud</title>
 
 <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-firestore-compat.js"></script>
@@ -29,18 +29,11 @@
   .top-bar{ height:60px; border-bottom:1px solid var(--border); display:flex; align-items:center; justify-content:space-between; padding:0 20px; background:var(--panel); }
   .content{ flex:1; overflow-y:auto; padding:20px; }
   
-  /* Login Modal */
   #loginOverlay{ position:fixed; inset:0; background:rgba(0,0,0,0.9); backdrop-filter:blur(8px); display:flex; align-items:center; justify-content:center; z-index:999; }
   .login-box{ background:var(--panel); padding:30px; border-radius:16px; border:1px solid var(--border); width:380px; text-align:center; }
   input, select, button{ width:100%; padding:12px; border-radius:10px; border:1px solid var(--border); background:var(--bg); color:var(--text); margin-top:10px; }
   button.primary{ background:var(--primary); border:none; font-weight:bold; cursor:pointer; }
   .hidden{ display:none; }
-  
-  /* Tables & Lists */
-  table{ width:100%; border-collapse:collapse; background:var(--panel); border-radius:12px; overflow:hidden; }
-  th, td{ padding:12px; text-align:left; border-bottom:1px solid var(--border); font-size:14px; }
-  th{ color:var(--text-dim); background:rgba(255,255,255,0.02); }
-  .badge{ padding:2px 8px; border-radius:12px; font-size:11px; border:1px solid var(--border); }
 </style>
 </head>
 <body>
@@ -48,31 +41,30 @@
 <div id="loginOverlay">
   <div class="login-box">
     <h2 style="margin-top:0">Accesso Gestionale</h2>
-    <p style="color:var(--text-dim); font-size:14px">Inserisci il tuo nome e reparto per iniziare</p>
+    <p style="color:var(--text-dim); font-size:14px">Seleziona il tuo profilo per iniziare</p>
     <input type="text" id="loginName" placeholder="Tuo Nome (es. Rossi M.)">
     <select id="loginSection"></select>
-    <button id="loginBtn" class="primary">Accedi / Crea Profilo</button>
+    <button id="loginBtn" class="primary">Accedi al Cloud</button>
   </div>
 </div>
 
 <aside>
-  <div class="sidebar-header">UFF-MANAGER v0.5</div>
+  <div class="sidebar-header">UFF-MANAGER v0.6</div>
   <nav>
     <button class="nav-item active" onclick="switchView('dashboard')">📊 Dashboard</button>
     <button class="nav-item" onclick="switchView('tasks')">🗂 Task (Kanban)</button>
     <button class="nav-item" onclick="switchView('notes')">📝 Note & Appunti</button>
     <button class="nav-item" onclick="switchView('registro')">📑 Registro Smarcamento</button>
-    <button class="nav-item" onclick="switchView('appointments')">📅 Appuntamenti</button>
   </nav>
   <div style="padding:20px; border-top:1px solid var(--border)">
     <div id="userInfo" style="font-size:12px; color:var(--text-dim); margin-bottom:10px"></div>
-    <button onclick="location.reload()" style="background:var(--danger); border:none; padding:8px; font-size:12px;">Esci</button>
+    <button onclick="location.reload()" style="background:var(--danger); border:none; padding:8px; font-size:12px; width:100%; color:white; cursor:pointer;">Esci</button>
   </div>
 </aside>
 
 <main>
   <div class="top-bar">
-    <div id="viewTitle" style="font-weight:bold">Dashboard</div>
+    <div id="viewTitle" style="font-weight:bold">DASHBOARD</div>
     <button id="addBtn" class="primary" style="width:auto; margin:0; padding:8px 16px">+ Nuovo</button>
   </div>
   <div class="content" id="mainContent"></div>
@@ -96,44 +88,41 @@ let currentUser = null;
 let currentView = 'dashboard';
 const sections = ['Capo Ufficio','Droni','Ala Rotante','Ala Fissa','Armamento','Interfaccia UUNN'];
 
-// Inizializza select login
+// Popola menu sezioni
 const sel = document.getElementById('loginSection');
 sections.forEach(s => { const o = document.createElement('option'); o.value=s; o.textContent=s; sel.appendChild(o); });
 
-// GESTIONE LOGIN
+// LOGICA LOGIN
 document.getElementById('loginBtn').onclick = async () => {
-    console.log("Pulsante cliccato!"); // Questo DEVE apparire in F12
-    
     const name = document.getElementById('loginName').value.trim();
     const section = document.getElementById('loginSection').value;
     
-    if(!name) { 
-        alert("Inserisci il tuo nome!"); 
-        return; 
-    }
+    if(!name) { alert("Inserisci il tuo nome!"); return; }
 
     try {
-        console.log("Tentativo di connessione a Firebase per:", name);
+        console.log("Connessione a Firebase...");
         
-        // Salviamo l'utente nel database
+        // Registra l'accesso su Firebase
         await db.collection("users").doc(name).set({
             name: name,
             section: section,
             lastLogin: new Date().toISOString()
         }, { merge: true });
 
-        console.log("Login riuscito sul database!");
+        // SALVATAGGIO STATO LOCALE
+        currentUser = { name: name, section: section };
         
-        // Nascondiamo il login e mostriamo l'app
+        // INTERFACCIA
         document.getElementById('loginOverlay').style.display = 'none';
-        document.getElementById('userDisplay').textContent = name + " (" + section + ")";
+        document.getElementById('userInfo').textContent = `Utente: ${name} (${section})`;
         
-        user = { name, section };
-        startSync(); // Avvia il caricamento dei dati
+        console.log("Login OK!");
+        render(); // Mostra la dashboard
+        initRealtimeData(); // Attiva la sincronizzazione
         
     } catch (error) {
-        console.error("ERRORE DURANTE IL LOGIN:", error);
-        alert("Errore di connessione: " + error.message);
+        console.error("Errore:", error);
+        alert("Errore di connessione al database. Controlla le 'Rules' su Firebase!");
     }
 };
 
@@ -141,41 +130,43 @@ function switchView(view) {
     currentView = view;
     document.querySelectorAll('.nav-item').forEach(btn => btn.classList.remove('active'));
     document.getElementById('viewTitle').textContent = view.toUpperCase();
-    // Qui andrà la logica di render specifica per ogni vista
     render();
 }
 
-// SINCRONIZZAZIONE DATI
 function initRealtimeData() {
     db.collection("tasks").onSnapshot(() => render());
-    db.collection("notes").onSnapshot(() => render());
-    db.collection("registry").onSnapshot(() => render());
 }
 
 function render() {
     const container = document.getElementById('mainContent');
-    container.innerHTML = `<p style="color:var(--text-dim)">Caricamento dati Cloud in corso per la sezione ${currentView}...</p>`;
-    
-    // Implementazione semplificata per il test di login
+    if(!currentUser) return;
+
     if(currentView === 'dashboard') {
-        container.innerHTML = `<h1>Benvenuto nel Cloud, ${currentUser.name}</h1>
-        <p>Il sistema è ora connesso a Firebase. I dati inseriti qui saranno visibili in tutti gli uffici.</p>`;
+        container.innerHTML = `
+            <div style="background:var(--panel); padding:30px; border-radius:15px; border:1px solid var(--border)">
+                <h1 style="margin:0; color:var(--primary)">Benvenuto, ${currentUser.name}</h1>
+                <p style="color:var(--text-dim)">Il sistema Cloud è attivo e sincronizzato.</p>
+                <hr style="border:0; border-top:1px solid var(--border); margin:20px 0">
+                <p>Seleziona una voce dal menu a sinistra per gestire i task o il registro.</p>
+            </div>`;
+    } else {
+        container.innerHTML = `<p style="color:var(--text-dim)">Sezione ${currentView} pronta per l'uso.</p>`;
     }
 }
 
-// Funzione per aggiungere dati (Esempio)
+// Tasto Nuovo
 document.getElementById('addBtn').onclick = async () => {
-    const title = prompt(`Aggiungi nuovo elemento in ${currentView}:`);
+    if(!currentUser) return;
+    const title = prompt(`Cosa vuoi aggiungere in ${currentView}?`);
     if(title) {
         await db.collection(currentView).add({
-            title,
+            title: title,
             author: currentUser.name,
             section: currentUser.section,
             timestamp: firebase.firestore.FieldValue.serverTimestamp()
         });
     }
 };
-
 </script>
 </body>
 </html>
