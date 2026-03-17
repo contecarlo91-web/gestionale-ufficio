@@ -102,19 +102,39 @@ sections.forEach(s => { const o = document.createElement('option'); o.value=s; o
 
 // GESTIONE LOGIN
 document.getElementById('loginBtn').onclick = async () => {
+    console.log("Pulsante cliccato!"); // Questo DEVE apparire in F12
+    
     const name = document.getElementById('loginName').value.trim();
     const section = document.getElementById('loginSection').value;
     
-    if(!name) { alert("Inserisci un nome"); return; }
-    
-    currentUser = { name, section };
-    document.getElementById('loginOverlay').classList.add('hidden');
-    document.getElementById('userInfo').textContent = `Utente: ${name} (${section})`;
-    
-    // Salva l'utente nel database se non esiste
-    await db.collection("users").doc(name).set(currentUser, { merge: true });
-    
-    initRealtimeData();
+    if(!name) { 
+        alert("Inserisci il tuo nome!"); 
+        return; 
+    }
+
+    try {
+        console.log("Tentativo di connessione a Firebase per:", name);
+        
+        // Salviamo l'utente nel database
+        await db.collection("users").doc(name).set({
+            name: name,
+            section: section,
+            lastLogin: new Date().toISOString()
+        }, { merge: true });
+
+        console.log("Login riuscito sul database!");
+        
+        // Nascondiamo il login e mostriamo l'app
+        document.getElementById('loginOverlay').style.display = 'none';
+        document.getElementById('userDisplay').textContent = name + " (" + section + ")";
+        
+        user = { name, section };
+        startSync(); // Avvia il caricamento dei dati
+        
+    } catch (error) {
+        console.error("ERRORE DURANTE IL LOGIN:", error);
+        alert("Errore di connessione: " + error.message);
+    }
 };
 
 function switchView(view) {
