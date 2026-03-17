@@ -1,0 +1,242 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Task Manager Ufficio v0.4 - Cloud Sync</title>
+
+<script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-firestore-compat.js"></script>
+
+<style>
+  :root{
+    --bg:#0f172a; --panel:#111827; --muted:#1f2937; --text:#e5e7eb; 
+    --text-dim:#9ca3af; --primary:#3b82f6; --danger:#ef4444; 
+    --warning:#f59e0b; --success:#10b981; --card:#0b1220; --border:#334155;
+  }
+  *{box-sizing:border-box}
+  body{
+    margin:0; font-family: system-ui, sans-serif;
+    background: var(--bg); color: var(--text);
+    display: flex; height: 100vh; overflow: hidden;
+  }
+  /* ... (Il resto del CSS rimane identico al tuo originale per mantenere la grafica) ... */
+  aside{ width:240px; background:var(--panel); border-right:1px solid var(--border); display:flex; flex-direction:column; }
+  main{ flex:1; display:flex; flex-direction:column; overflow:hidden; }
+  .sidebar-header{ padding:20px; font-weight:bold; font-size:1.1rem; color:var(--primary); border-bottom:1px solid var(--border); }
+  nav{ flex:1; padding:10px; overflow-y:auto; }
+  .nav-item{ padding:10px; cursor:pointer; border-radius:6px; margin-bottom:4px; transition:0.2s; color:var(--text-dim); display:flex; align-items:center; gap:10px; }
+  .nav-item:hover, .nav-item.active{ background:var(--muted); color:var(--text); }
+  .top-bar{ height:60px; border-bottom:1px solid var(--border); display:flex; align-items:center; justify-content:space-between; padding:0 20px; background:var(--panel); }
+  .content{ flex:1; overflow-y:auto; padding:20px; }
+  /* Classi per Kanban */
+  .kanban-board{ display:flex; gap:20px; height:100%; align-items:flex-start; }
+  .kanban-col{ background:var(--muted); border-radius:8px; width:320px; display:flex; flex-direction:column; max-height:100%; }
+  .kanban-header{ padding:12px; font-weight:bold; border-bottom:1px solid var(--border); display:flex; justify-content:space-between; }
+  .kanban-list{ padding:10px; overflow-y:auto; min-height:100px; flex:1; }
+  .card{ background:var(--card); border:1px solid var(--border); padding:12px; border-radius:6px; margin-bottom:10px; cursor:grab; }
+  .card:active{ cursor:grabbing; }
+  /* Login Modal */
+  #loginOverlay{ position:fixed; inset:0; background:rgba(0,0,0,0.85); backdrop-filter:blur(5px); display:flex; align-items:center; justify-content:center; z-index:999; }
+  .login-box{ background:var(--panel); padding:30px; border-radius:12px; border:1px solid var(--border); width:350px; text-align:center; }
+  select, input, button{ width:100%; padding:10px; border-radius:6px; border:1px solid var(--border); background:var(--bg); color:var(--text); margin-top:10px; }
+  button{ background:var(--primary); font-weight:bold; cursor:pointer; border:none; }
+  button:hover{ opacity:0.9; }
+  .hidden{ display:none; }
+</style>
+</head>
+<body>
+
+<div id="loginOverlay">
+  <div class="login-box">
+    <h2>Accesso Gestionale</h2>
+    <p style="color:var(--text-dim)">Seleziona il tuo profilo</p>
+    <select id="userSelect"></select>
+    <button id="loginBtn">Entra</button>
+    <hr style="border:0; border-top:1px solid var(--border); margin:20px 0;">
+    <button id="addSectionBtn" style="background:var(--muted); font-size:0.8rem;">+ Aggiungi Nuovo Reparto</button>
+  </div>
+</div>
+
+<aside>
+  <div class="sidebar-header">UFF-MANAGER v0.4</div>
+  <nav id="menuNav">
+    <div class="nav-item active" onclick="switchView('dashboard')">Dashboard</div>
+    <div class="nav-item" onclick="switchView('kanban')">Kanban Task</div>
+    <div class="nav-item" onclick="switchView('calendar')">Appuntamenti</div>
+    <div class="nav-item" onclick="switchView('notes')">Note & Appunti</div>
+    <div class="nav-item" onclick="switchView('registro')">Registro Smarcamento</div>
+  </nav>
+  <div style="padding:20px; border-top:1px solid var(--border)">
+    <button id="logoutBtn" style="background:var(--danger)">Esci (Utente: <span id="curUserLabel">?</span>)</button>
+  </div>
+</aside>
+
+<main>
+  <div class="top-bar">
+    <div id="viewTitle" style="font-weight:bold; font-size:1.2rem;">Dashboard</div>
+    <div style="display:flex; gap:10px;">
+      <input type="text" id="searchInput" placeholder="Cerca..." style="width:200px; margin:0">
+      <button onclick="openModal()" style="width:auto; padding:0 15px;">+ Nuovo</button>
+    </div>
+  </div>
+  <div class="content" id="mainContent">
+    </div>
+</main>
+
+<script>
+// CONFIGURAZIONE FIREBASE (I TUOI DATI)
+const firebaseConfig = {
+    apiKey: "AIzaSyCxLfCQ8igfytfdMuiJIN6uSZq2fcY0xuQ",
+    authDomain: "task-ufficio.firebaseapp.com",
+    projectId: "task-ufficio",
+    storageBucket: "task-ufficio.firebasestorage.app",
+    messagingSenderId: "435367581032",
+    appId: "1:435367581032:web:d77014469b570c9e9672dd"
+};
+
+firebase.initializeApp(firebaseConfig);
+const db = firebase.firestore();
+
+// STATO LOCALE (Viene sincronizzato con Firebase)
+let state = {
+  currentUser: null,
+  sections: ["Sezione Droni", "Sezione Armamento", "Segreteria"],
+  tasks: [],
+  notes: [],
+  appointments: []
+};
+
+let currentView = 'dashboard';
+let searchQuery = "";
+
+// --- SINCRONIZZAZIONE REAL-TIME ---
+function initRealtimeSync() {
+  // Ascolta i cambiamenti ai Task
+  db.collection("tasks").onSnapshot(snapshot => {
+    state.tasks = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+    render();
+  });
+
+  // Ascolta i cambiamenti alle Note
+  db.collection("notes").onSnapshot(snapshot => {
+    state.notes = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+    render();
+  });
+
+  // Ascolta i cambiamenti alle Sezioni (Reparti)
+  db.collection("config").doc("sections").onSnapshot(doc => {
+    if(doc.exists) {
+      state.sections = doc.data().list;
+      updateUserSelect();
+    }
+  });
+}
+
+// --- FUNZIONI DI SALVATAGGIO ---
+async function addTask(task) {
+  await db.collection("tasks").add(task);
+}
+
+async function updateTask(id, data) {
+  await db.collection("tasks").doc(id).update(data);
+}
+
+async function deleteData(collection, id) {
+  if(confirm("Eliminare definitivamente?")) {
+    await db.collection(collection).doc(id).delete();
+  }
+}
+
+// --- LOGICA LOGIN ---
+function updateUserSelect() {
+  const sel = document.getElementById('userSelect');
+  sel.innerHTML = state.sections.map(s => `<option value="${s}">${s}</option>`).join('');
+}
+
+document.getElementById('loginBtn').onclick = () => {
+  state.currentUser = document.getElementById('userSelect').value;
+  document.getElementById('loginOverlay').classList.add('hidden');
+  document.getElementById('curUserLabel').textContent = state.currentUser;
+  initRealtimeSync(); // Avvia la sincronizzazione solo dopo il login
+};
+
+document.getElementById('addSectionBtn').onclick = async () => {
+  const name = prompt("Nome nuovo reparto:");
+  if(name) {
+    state.sections.push(name);
+    await db.collection("config").doc("sections").set({ list: state.sections });
+  }
+};
+
+// --- LOGICA DI RENDERING (Semplificata) ---
+function switchView(view) {
+  currentView = view;
+  document.querySelectorAll('.nav-item').forEach(el => el.classList.remove('active'));
+  document.getElementById('viewTitle').textContent = view.toUpperCase();
+  render();
+}
+
+function render() {
+  const container = document.getElementById('mainContent');
+  if (!state.currentUser) return;
+
+  if (currentView === 'kanban') {
+    renderKanban(container);
+  } else if (currentView === 'dashboard') {
+    container.innerHTML = `<h2>Benvenuto, ${state.currentUser}</h2><p>Hai ${state.tasks.filter(t => t.status !== 'done').length} task attivi.</p>`;
+  } else {
+    container.innerHTML = `<p style="color:var(--text-dim)">Sezione ${currentView} in fase di caricamento dati...</p>`;
+  }
+}
+
+function renderKanban(container) {
+  const columns = ['todo', 'doing', 'done'];
+  container.innerHTML = `<div class="kanban-board"></div>`;
+  const board = container.querySelector('.kanban-board');
+
+  columns.forEach(col => {
+    const colEl = document.createElement('div');
+    colEl.className = 'kanban-col';
+    colEl.innerHTML = `<div class="kanban-header"><span>${col.toUpperCase()}</span></div><div class="kanban-list" id="col-${col}" ondragover="allowDrop(event)" ondrop="drop(event, '${col}')"></div>`;
+    
+    const list = colEl.querySelector('.kanban-list');
+    state.tasks.filter(t => t.status === col).forEach(t => {
+      const card = document.createElement('div');
+      card.className = 'card';
+      card.draggable = true;
+      card.id = t.id;
+      card.ondragstart = (e) => e.dataTransfer.setData("text", t.id);
+      card.innerHTML = `<strong>${t.title}</strong><br><small>${t.user}</small>`;
+      list.appendChild(card);
+    });
+    board.appendChild(colEl);
+  });
+}
+
+// Drag & Drop
+window.allowDrop = (e) => e.preventDefault();
+window.drop = async (e, newStatus) => {
+  e.preventDefault();
+  const id = e.dataTransfer.getData("text");
+  await updateTask(id, { status: newStatus });
+};
+
+// Inizializzazione
+updateUserSelect();
+
+// Esempio funzione aggiunta rapida (da collegare a un vero modal)
+window.openModal = async () => {
+  const title = prompt("Titolo del Task:");
+  if(title) {
+    await addTask({
+      title: title,
+      user: state.currentUser,
+      status: 'todo',
+      createdAt: new Date().toISOString()
+    });
+  }
+};
+</script>
+</body>
+</html>
