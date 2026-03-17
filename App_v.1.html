@@ -3,20 +3,27 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Task Manager Ufficio - CLOUD v1.2</title>
+<title>Task Manager Ufficio - Cloud realtime v0.7</title>
 <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-firestore-compat.js"></script>
 <style>
-  /* STILI ORIGINALI RIPRISTINATI AL 100% */
   :root{
-    --bg:#0f172a; --panel:#111827; --muted:#1f2937; --text:#e5e7eb;
-    --text-dim:#9ca3af; --primary:#3b82f6; --danger:#ef4444;
-    --warning:#f59e0b; --success:#10b981; --card:#0b1220;
-    --border:#334155; --badge:#0a1222;
+    --bg:#0f172a;        /* slate-900 */
+    --panel:#111827;     /* gray-900 */
+    --muted:#1f2937;     /* gray-800 */
+    --text:#e5e7eb;      /* gray-200 */
+    --text-dim:#9ca3af;  /* gray-400 */
+    --primary:#3b82f6;   /* blue-500 */
+    --danger:#ef4444;    /* red-500 */
+    --warning:#f59e0b;   /* amber-500 */
+    --success:#10b981;   /* emerald-500 */
+    --card:#0b1220;      /* dark card */
+    --border:#334155;    /* slate-700 */
+    --badge:#0a1222;
   }
   *{box-sizing:border-box}
   body{
-    margin:0; font-family: system-ui, -apple-system, sans-serif;
+    margin:0; font-family: system-ui, -apple-system, Segoe UI, Roboto, Ubuntu, Cantarell, Noto Sans, "Helvetica Neue", Arial, "Apple Color Emoji", "Segoe UI Emoji";
     background:linear-gradient(135deg,#0b1020,#0d1326 35%,#0f172a);
     color:var(--text);
   }
@@ -29,11 +36,13 @@
   header h1{ margin:0; font-size:18px; letter-spacing:.4px; }
   .user-chip{ display:flex; align-items:center; gap:8px; }
   .user-chip .dot{ width:8px; height:8px; border-radius:50%; background:var(--success); }
-  .btn{ all:unset; cursor:pointer; padding:8px 12px; border:1px solid var(--border); border-radius:10px; background:var(--panel); text-align:center; }
+  .btn{ all:unset; cursor:pointer; padding:8px 12px; border:1px solid var(--border); border-radius:10px; background:var(--panel); }
   .btn:hover{ border-color:var(--primary) }
   .btn.primary{ background:var(--primary); color:white; border-color:transparent; }
   .btn.danger{ background:var(--danger); color:white; border-color:transparent; }
+  .btn.ghost{ background:transparent; }
   .btn.small{ padding:4px 8px; border-radius:8px; font-size:12px; }
+  .btn.icon{ padding:4px; width:28px; height:28px; display:inline-grid; place-items:center; }
 
   .layout{ display:grid; grid-template-columns: 260px 1fr; min-height:calc(100dvh - 56px); }
   nav.sidebar{
@@ -44,41 +53,90 @@
   nav.sidebar h3{ font-size:12px; text-transform:uppercase; color:var(--text-dim); margin:8px 8px; }
   nav.sidebar .menu{ display:flex; flex-direction:column; gap:6px; }
   nav.sidebar button{
-    all:unset; cursor:pointer; padding:10px 12px; border-radius:10px; display:flex; gap:10px; align-items:center; width:100%;
+    all:unset; cursor:pointer; padding:10px 12px; border-radius:10px; display:flex; gap:10px; align-items:center;
   }
+  nav.sidebar button:hover{ background:rgba(255,255,255,.06); }
   nav.sidebar button.active{ background:rgba(59,130,246,.18); outline:1px solid rgba(59,130,246,.35); }
-  main{ padding:16px; overflow-y:auto; }
-  
-  /* Toolbar e Filtri */
+  main{ padding:16px; }
   .toolbar{ display:flex; gap:8px; flex-wrap:wrap; align-items:center; margin-bottom:12px; }
-  .search{ background:var(--panel); border:1px solid var(--border); border-radius:10px; padding:8px 12px; min-width:240px; color:white; }
-  
-  /* Tabelle e Kanban ORIGINALI */
-  table{ width:100%; border-collapse:collapse; background:var(--panel); border:1px solid var(--border); border-radius:14px; overflow:hidden; }
-  th, td{ border-bottom:1px solid var(--border); padding:10px; text-align:left; font-size:14px; }
-  th{ color:var(--text-dim); background:rgba(255,255,255,.02); }
+  .toolbar .segmented{ display:inline-flex; background:var(--panel); border:1px solid var(--border); border-radius:12px; overflow:hidden; }
+  .segmented button{ all:unset; padding:8px 12px; cursor:pointer; }
+  .segmented button.active{ background:var(--primary); color:white; }
+  .search{ background:var(--panel); border:1px solid var(--border); border-radius:10px; padding:8px 12px; min-width:240px; }
+  .grid-2{ display:grid; grid-template-columns: 1fr 1fr; gap:16px; }
+  .cards{ display:grid; grid-template-columns: repeat(4, 1fr); gap:12px; }
+  .kpi{ background:var(--panel); border:1px solid var(--border); border-radius:14px; padding:16px; }
+  .kpi .val{ font-size:28px; font-weight:600; }
   .kanban{ display:grid; grid-template-columns: repeat(4, 1fr); gap:16px; }
   .col{ background:var(--panel); border:1px solid var(--border); border-radius:14px; padding:10px; }
-  .card{ background:var(--card); border:1px solid var(--border); border-radius:12px; padding:10px; margin-bottom:8px; }
+  .col h4{ margin:6px 8px 12px; font-size:14px; color:var(--text-dim); display:flex; justify-content:space-between; align-items:center; }
+  .dropzone{ min-height:120px; display:flex; flex-direction:column; gap:8px; }
+  .card{ background:var(--card); border:1px solid var(--border); border-radius:12px; padding:10px; display:block; }
+  .card:hover{ border-color:var(--primary); }
+  .meta{ font-size:12px; color:var(--text-dim); display:flex; justify-content:space-between; gap:8px; align-items:center; }
   .badge{ font-size:11px; padding:2px 8px; border-radius:999px; border:1px solid var(--border); background:var(--badge); }
-  
-  /* Modale Login */
-  .modal-backdrop{ position:fixed; inset:0; background:rgba(0,0,0,.8); display:flex; align-items:center; justify-content:center; z-index:100; }
-  .modal{ width:400px; background:var(--panel); border:1px solid var(--border); border-radius:16px; padding:24px; }
+  .badge.red{ border-color:var(--danger) }
+  .badge.amber{ border-color:var(--warning) }
+  .badge.green{ border-color:var(--success) }
+  .danger{ color:var(--danger) }
+  .amber{ color:var(--warning) }
+  .green{ color:var(--success) }
+  .section-badge{ font-size:11px; font-weight:600; padding:2px 8px; border-radius:999px; background:rgba(59,130,246,.15); border:1px solid rgba(59,130,246,.35); }
+  table{ width:100%; border-collapse:collapse; background:var(--panel); border:1px solid var(--border); border-radius:14px; overflow:hidden; }
+  th, td{ border-bottom:1px solid var(--border); padding:10px; text-align:left; font-size:14px; vertical-align:top; }
+  th{ color:var(--text-dim); font-weight:600; background:rgba(255,255,255,.02); }
+  tr:last-child td{ border-bottom:none; }
+  .right{ text-align:right; }
+  .muted{ color:var(--text-dim); }
   .hidden{ display:none !important; }
+  .archived-row{ opacity:.6; }
+
+  /* Modal/Login */
+  .modal-backdrop{
+    position:fixed; inset:0; background:rgba(0,0,0,.6); display:flex; align-items:center; justify-content:center; z-index:50;
+  }
+  .modal{ width:min(680px, 92vw); background:var(--panel); border:1px solid var(--border); border-radius:16px; padding:16px; }
+  .modal h3{ margin-top:0; }
+  .field{ display:flex; flex-direction:column; gap:6px; margin-bottom:12px; }
+  .input, select, textarea{
+    background:var(--card); color:var(--text); border:1px solid var(--border); border-radius:10px; padding:8px 10px;
+  }
+  textarea{ min-height:80px; resize:vertical; }
+  label{ font-size:12px; color:var(--text-dim); }
+  .row{ display:flex; gap:8px; flex-wrap:wrap; }
+  .subgrid{ display:grid; grid-template-columns: 1fr 1fr 1fr; gap:8px; }
+
+  /* Print */
+  @media print{
+    header, nav.sidebar, .toolbar, .no-print { display:none !important; }
+    .layout{ grid-template-columns: 1fr; }
+    body{ background:white; color:black; }
+    .col, .kpi, table{ border:1px solid #aaa; }
+  }
 </style>
 </head>
 <body>
-
 <header>
-  <h1 id="header-title">Task Manager — Cloud</h1>
-  <div class="toolbar">
-    <input id="searchInput" class="search" type="search" placeholder="Cerca...">
-    <select id="sectionFilter" class="search"><option value="">Tutte le sezioni</option></select>
+  <h1 id="header-title">Task Manager — Ufficio</h1>
+  <div class="toolbar no-print">
+    <input id="searchInput" class="search" type="search" placeholder="Cerca titolo…">
+    <div class="segmented" aria-label="Selettore vista sezione">
+      <button id="viewMineBtn" class="active" title="Mostra solo la mia sezione">Mia sezione</button>
+      <button id="viewAllBtn" title="Mostra tutte le sezioni">Tutte</button>
+    </div>
+    <select id="sectionFilter" title="Filtra per sezione">
+      <option value="">Sezione: tutte</option>
+    </select>
+    <select id="userFilter" title="Filtra per utente">
+      <option value="">Utente: tutti</option>
+    </select>
+    <button id="exportCsvBtn" class="btn small">Esporta CSV (Task)</button>
   </div>
-  <div class="user-chip">
-    <span id="userLabel" class="muted">Caricamento...</span>
-    <button id="logoutBtn" class="btn small">Esci</button>
+  <div class="user-chip no-print">
+    <span class="dot" aria-hidden="true"></span>
+    <span id="userLabel" class="muted">Non connesso</span>
+    <span id="syncLabel" class="badge">Solo locale</span>
+    <button id="logoutBtn" class="btn small ghost">Esci</button>
   </div>
 </header>
 
@@ -86,7 +144,1170 @@
   <nav class="sidebar">
     <h3>Menu</h3>
     <div class="menu">
-      <button class="nav-item active" onclick="switchView('dashboard')">📊 Dashboard</button>
-      <button class="nav-item" onclick="switchView('boardTask')">🗂 Kanban — Task</button>
-      <button class="nav-item" onclick="switchView('registry')">📑 Registro Smarcamento</button>
-      <button class="nav-item" onclick
+      <button id="btnDashboard" class="active" onclick="switchView('dashboard')">📊 Dashboard</button>
+      <button id="btnBoardTask" onclick="switchView('boardTask')">🗂 Kanban — Task</button>
+      <button id="btnBoardNotes" onclick="switchView('boardNotes')">📝 Kanban — Appunti/Note</button>
+      <button id="btnRegistry" onclick="switchView('registry')">📑 Registro smarcamento Appunti/Note</button>
+      <button id="btnAppointments" onclick="switchView('appointments')">📅 Appuntamenti</button>
+      <button id="btnArchive" onclick="switchView('archive')">📦 Archivio (Task)</button>
+      <button id="btnTrash" onclick="switchView('trash')">🗑️ Cestino (Task)</button>
+      <h3>Strumenti</h3>
+      <button id="btnUsers" onclick="switchView('users')">👥 Utenti</button>
+      <button id="btnSections" onclick="switchView('sections')">🏷️ Sezioni</button>
+    </div>
+  </nav>
+  <main id="main">
+    <!-- Views will be rendered here -->
+  </main>
+</div>
+
+<!-- Login Modal -->
+<div id="loginModal" class="modal-backdrop hidden" role="dialog" aria-modal="true" aria-labelledby="loginTitle">
+  <div class="modal">
+    <h3 id="loginTitle">Accesso</h3>
+    <p class="muted">Accedi per lavorare nella tua sezione. Puoi comunque vedere le attività di tutte le sezioni.</p>
+    <div class="field">
+      <label for="loginName">Nome</label>
+      <input id="loginName" class="input" placeholder="Es. Rossi M.">
+    </div>
+    <div class="field">
+      <label for="loginSection">Sezione</label>
+      <select id="loginSection"></select>
+    </div>
+    <div class="row">
+      <button id="loginBtn" class="btn primary">Entra</button>
+      <button id="addSectionBtn" class="btn">Aggiungi sezione…</button>
+    </div>
+  </div>
+</div>
+
+<script>
+/* =====================
+   Utility & State
+===================== */
+const PRIORITY_ORDER = { 'Alta':0, 'Media':1, 'Bassa':2 };
+const TASK_STATUS = ['da_fare','in_corso','in_visione_cu','completato','archiviato'];
+
+const DEFAULT_SECTIONS = ['Capo Ufficio','Droni','Ala Rotante','Ala Fissa','Armamento','Interfaccia UUNN'];
+
+const STORAGE_KEY = 'tm_state_v0_7_cloud_cache';
+const LEGACY_STORAGE_KEYS = ['tm_state_v0_3', 'tm_state_v1'];
+const CURRENT_USER_KEY = 'tm_current_user_v0_7';
+const CLOUD_COLLECTION = 'task_manager_ufficio';
+const CLOUD_DOCUMENT = 'shared_state';
+
+const firebaseConfig = {
+  apiKey: "AIzaSyCxLfCQ8igfytfdMuiJIN6uSZq2fcY0xuQ",
+  authDomain: "task-ufficio.firebaseapp.com",
+  projectId: "task-ufficio",
+  storageBucket: "task-ufficio.firebasestorage.app",
+  messagingSenderId: "435367581032",
+  appId: "1:435367581032:web:d77014469b570c9e9672dd"
+};
+
+let state = {
+  users: [],
+  sections: [],
+  tasks: [],
+  notes: [],
+  registry: [],
+  appointments: [],
+  currentUser: null
+};
+
+let db = null;
+let cloudDocRef = null;
+let cloudReady = false;
+let cloudUnsubscribe = null;
+let saveTimer = null;
+let isApplyingRemoteState = false;
+let lastRemoteSignature = '';
+
+function uid(prefix='id'){
+  return prefix + '_' + Math.random().toString(36).slice(2,10);
+}
+
+function updateSyncLabel(text, tone=''){
+  const el = document.getElementById('syncLabel');
+  if(!el) return;
+  el.textContent = text;
+  el.className = 'badge';
+  if(tone === 'ok') el.classList.add('green');
+  if(tone === 'warn') el.classList.add('amber');
+  if(tone === 'danger') el.classList.add('red');
+}
+
+function makeDefaultState(){
+  return {
+    users: [],
+    sections: DEFAULT_SECTIONS.slice(),
+    tasks: [],
+    notes: [],
+    registry: [],
+    appointments: [],
+    currentUser: null
+  };
+}
+
+function serializeSharedState(includeMeta=true){
+  const payload = {
+    users: Array.isArray(state.users) ? state.users : [],
+    sections: Array.isArray(state.sections) && state.sections.length ? state.sections : DEFAULT_SECTIONS.slice(),
+    tasks: Array.isArray(state.tasks) ? state.tasks : [],
+    notes: Array.isArray(state.notes) ? state.notes : [],
+    registry: Array.isArray(state.registry) ? state.registry : [],
+    appointments: Array.isArray(state.appointments) ? state.appointments : []
+  };
+  if(includeMeta){
+    payload.__meta = {
+      updatedAt: cloudReady && firebase?.firestore?.FieldValue ? firebase.firestore.FieldValue.serverTimestamp() : new Date().toISOString(),
+      updatedBy: state.currentUser?.name || 'sistema'
+    };
+  }
+  return payload;
+}
+
+function serializeLocalState(){
+  return {
+    ...serializeSharedState(false),
+    currentUser: state.currentUser || null
+  };
+}
+
+function coreSignature(data){
+  return JSON.stringify({
+    users: data.users || [],
+    sections: data.sections || [],
+    tasks: data.tasks || [],
+    notes: data.notes || [],
+    registry: data.registry || [],
+    appointments: data.appointments || []
+  });
+}
+
+function persistLocalCache(){
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(serializeLocalState()));
+  if(state.currentUser) localStorage.setItem(CURRENT_USER_KEY, JSON.stringify(state.currentUser));
+  else localStorage.removeItem(CURRENT_USER_KEY);
+}
+
+function queueCloudSave(){
+  if(!cloudReady || !cloudDocRef || isApplyingRemoteState) return;
+  if(saveTimer) clearTimeout(saveTimer);
+  updateSyncLabel('Sincronizzazione…', 'warn');
+  saveTimer = setTimeout(async () => {
+    try{
+      const payload = serializeSharedState(true);
+      lastRemoteSignature = coreSignature(payload);
+      await cloudDocRef.set(payload, { merge: false });
+      updateSyncLabel('Sincronizzato', 'ok');
+    }catch(err){
+      console.error('Errore salvataggio cloud:', err);
+      updateSyncLabel('Errore cloud', 'danger');
+    }
+  }, 150);
+}
+
+function saveState(){
+  persistLocalCache();
+  queueCloudSave();
+}
+
+function normalizeState(data){
+  const safe = makeDefaultState();
+  const source = data || {};
+
+  safe.users = Array.isArray(source.users) ? source.users.map(u => ({
+    id: u.id || uid('usr'),
+    name: String(u.name || '').trim(),
+    section: String(u.section || '').trim() || DEFAULT_SECTIONS[0]
+  })).filter(u => u.name) : [];
+
+  safe.sections = Array.isArray(source.sections) && source.sections.length
+    ? source.sections.map(s => String(s || '').trim()).filter(Boolean)
+    : DEFAULT_SECTIONS.slice();
+
+  safe.tasks = Array.isArray(source.tasks) ? source.tasks.map(t => ({
+    id: t.id || uid('tsk'),
+    title: '' + (t.title || ''),
+    priority: ['Alta','Media','Bassa'].includes(t.priority) ? t.priority : 'Media',
+    due: t.due || '',
+    status: TASK_STATUS.includes(t.status === 'coordinato' ? 'completato' : t.status)
+      ? (t.status === 'coordinato' ? 'completato' : t.status)
+      : 'da_fare',
+    section: t.section || safe.sections[0] || DEFAULT_SECTIONS[0],
+    createdBy: t.createdBy || 'sistema',
+    createdById: t.createdById || (safe.users.find(u => u.name === t.createdBy)?.id ?? ''),
+    deleted: !!t.deleted
+  })) : [];
+
+  safe.notes = Array.isArray(source.notes) ? source.notes.map(n => ({
+    id: n.id || uid('note'),
+    title: '' + (n.title || ''),
+    priority: ['Alta','Media','Bassa'].includes(n.priority) ? n.priority : 'Media',
+    due: n.due || '',
+    status: TASK_STATUS.includes(n.status) ? n.status : 'da_fare',
+    section: n.section || safe.sections[0] || DEFAULT_SECTIONS[0],
+    createdBy: n.createdBy || 'sistema',
+    createdById: n.createdById || (safe.users.find(u => u.name === n.createdBy)?.id ?? ''),
+    deleted: !!n.deleted
+  })) : [];
+
+  safe.registry = Array.isArray(source.registry) ? source.registry.map(r => ({
+    id: r.id || uid('reg'),
+    tipoDoc: ['PROM','APT','NOTA'].includes(r.tipoDoc) ? r.tipoDoc : 'PROM',
+    nr: r.nr || '',
+    dataQual: r.dataQual || '',
+    uffCompetente: r.uffCompetente || '',
+    argomento: r.argomento || '',
+    reparti: r.reparti || { con:'', invio:'', rientro:'' },
+    scsmm: r.scsmm || { invio:'', rientro:'' },
+    note: r.note || '',
+    archived: !!r.archived,
+    deleted: !!r.deleted
+  })) : [];
+
+  safe.appointments = Array.isArray(source.appointments) ? source.appointments.map(a => ({
+    id: a.id || uid('app'),
+    title: '' + (a.title || ''),
+    date: a.date || '',
+    time: a.time || '',
+    responsibleUserId: a.responsibleUserId || '',
+    section: a.section || safe.sections[0] || DEFAULT_SECTIONS[0],
+    deleted: !!a.deleted
+  })) : [];
+
+  const localUser = source.currentUser || readCurrentUserCache();
+  safe.currentUser = localUser ? {
+    id: localUser.id || '',
+    name: localUser.name || '',
+    section: localUser.section || (safe.sections[0] || DEFAULT_SECTIONS[0])
+  } : null;
+
+  return safe;
+}
+
+function applyNormalizedState(nextState, preserveCurrentUser=true){
+  const preservedUser = preserveCurrentUser ? (state.currentUser || nextState.currentUser || null) : (nextState.currentUser || null);
+  state.users = nextState.users;
+  state.sections = nextState.sections.length ? nextState.sections : DEFAULT_SECTIONS.slice();
+  state.tasks = nextState.tasks;
+  state.notes = nextState.notes;
+  state.registry = nextState.registry;
+  state.appointments = nextState.appointments;
+  state.currentUser = preservedUser;
+  persistLocalCache();
+}
+
+function readCurrentUserCache(){
+  const raw = localStorage.getItem(CURRENT_USER_KEY);
+  if(!raw) return null;
+  try{ return JSON.parse(raw); }catch(_){ return null; }
+}
+
+function loadStateFromLocal(){
+  let raw = localStorage.getItem(STORAGE_KEY);
+  if(!raw){
+    for(const k of LEGACY_STORAGE_KEYS){
+      if(localStorage.getItem(k)){ raw = localStorage.getItem(k); break; }
+    }
+  }
+  if(!raw){
+    state = normalizeState(makeDefaultState());
+    state.currentUser = readCurrentUserCache();
+    return;
+  }
+
+  try{
+    const data = JSON.parse(raw);
+    state = normalizeState(data);
+  }catch(e){
+    console.warn('State parse error, resetting', e);
+    state = normalizeState(makeDefaultState());
+  }
+}
+
+async function initCloudSync(){
+  if(typeof firebase === 'undefined'){
+    console.warn('Firebase non disponibile: l\'app resta in locale.');
+    updateSyncLabel('Solo locale', 'warn');
+    return;
+  }
+
+  try{
+    firebase.initializeApp(firebaseConfig);
+  }catch(err){
+    if(!String(err?.message || '').includes('already exists')) throw err;
+  }
+
+  try{
+    db = firebase.firestore();
+    cloudDocRef = db.collection(CLOUD_COLLECTION).doc(CLOUD_DOCUMENT);
+    cloudReady = true;
+    updateSyncLabel('Connessione cloud…', 'warn');
+
+    const snap = await cloudDocRef.get();
+    if(snap.exists && snap.data()){
+      isApplyingRemoteState = true;
+      const nextState = normalizeState(snap.data());
+      applyNormalizedState(nextState, true);
+      lastRemoteSignature = coreSignature(snap.data());
+      isApplyingRemoteState = false;
+      render();
+      updateSyncLabel('Sincronizzato', 'ok');
+    }else{
+      await cloudDocRef.set(serializeSharedState(true), { merge: false });
+      lastRemoteSignature = coreSignature(serializeSharedState(false));
+      updateSyncLabel('Cloud inizializzato', 'ok');
+    }
+
+    if(cloudUnsubscribe) cloudUnsubscribe();
+    cloudUnsubscribe = cloudDocRef.onSnapshot((docSnap) => {
+      if(!docSnap.exists || !docSnap.data()) return;
+      const incoming = docSnap.data();
+      const incomingSignature = coreSignature(incoming);
+      if(incomingSignature === lastRemoteSignature) return;
+
+      isApplyingRemoteState = true;
+      applyNormalizedState(normalizeState(incoming), true);
+      lastRemoteSignature = incomingSignature;
+      isApplyingRemoteState = false;
+      render();
+      updateSyncLabel('Sincronizzato', 'ok');
+    }, (error) => {
+      console.error('Errore listener realtime:', error);
+      updateSyncLabel('Errore cloud', 'danger');
+    });
+  }catch(err){
+    console.error('Errore init cloud:', err);
+    cloudReady = false;
+    updateSyncLabel('Solo locale', 'warn');
+  }
+}
+
+function todayISO(){
+  const d = new Date();
+  return d.toISOString().slice(0,10);
+}
+function daysDiff(aISO, bISO){
+  if(!aISO || !bISO) return null;
+  const a = new Date(aISO + 'T00:00:00');
+  const b = new Date(bISO + 'T00:00:00');
+  const ms = a - b;
+  return Math.round(ms / (1000*60*60*24));
+}
+
+function byDueAsc(a,b){
+  const ad = a.due || '9999-12-31';
+  const bd = b.due || '9999-12-31';
+  if(ad === bd){ return PRIORITY_ORDER[a.priority] - PRIORITY_ORDER[b.priority]; }
+  return ad < bd ? -1 : 1;
+}
+
+/* =====================
+   Global UI state
+===================== */
+let currentView = 'dashboard';
+let viewScope = 'mine'; // 'mine' | 'all'
+let searchQuery = '';
+let filterSection = '';
+let filterUser = '';
+
+/* =====================
+   Rendering helpers
+===================== */
+const mainEl = document.getElementById('main');
+const btnMap = {
+  dashboard: 'btnDashboard',
+  boardTask: 'btnBoardTask',
+  boardNotes: 'btnBoardNotes',
+  registry: 'btnRegistry',
+  appointments: 'btnAppointments',
+  archive: 'btnArchive',
+  trash: 'btnTrash',
+  users: 'btnUsers',
+  sections: 'btnSections'
+};
+
+function switchView(key){
+  currentView = key;
+  render();
+  const active = document.querySelector('nav.sidebar button.active');
+  if(active) active.classList.remove('active');
+  const targetId = btnMap[key];
+  const btn = targetId ? document.getElementById(targetId) : null;
+  if(btn) btn.classList.add('active');
+}
+
+function clear(el){ while(el.firstChild) el.removeChild(el.firstChild); }
+
+function render(){
+  document.getElementById('userLabel').textContent = state.currentUser ? `${state.currentUser.name} — ${state.currentUser.section}` : 'Non connesso';
+  populateFilters();
+
+  clear(mainEl);
+  if(currentView === 'dashboard') renderDashboard();
+  else if(currentView === 'boardTask') renderBoard('tasks');
+  else if(currentView === 'boardNotes') renderBoard('notes');
+  else if(currentView === 'registry') renderRegistry();
+  else if(currentView === 'appointments') renderAppointments();
+  else if(currentView === 'archive') renderArchive();
+  else if(currentView === 'trash') renderTrash();
+  else if(currentView === 'users') renderUsers();
+  else if(currentView === 'sections') renderSections();
+}
+
+/* =====================
+   Filters
+===================== */
+function populateFilters(){
+  const secSel = document.getElementById('sectionFilter');
+  const usrSel = document.getElementById('userFilter');
+  const secVal = secSel.value;
+  clear(secSel);
+  const optAll = document.createElement('option'); optAll.value = ''; optAll.textContent = 'Sezione: tutte';
+  secSel.appendChild(optAll);
+  state.sections.forEach(s => { const o = document.createElement('option'); o.value = s; o.textContent = s; secSel.appendChild(o); });
+  secSel.value = secVal;
+
+  const usrVal = usrSel.value;
+  clear(usrSel);
+  const uopt = document.createElement('option'); uopt.value=''; uopt.textContent='Utente: tutti'; usrSel.appendChild(uopt);
+  state.users.forEach(u => { const o = document.createElement('option'); o.value = u.id; o.textContent = `${u.name} (${u.section})`; usrSel.appendChild(o); });
+  usrSel.value = usrVal;
+}
+
+/* =====================
+   Data filtering
+===================== */
+function visibleItems(kind, includeArchived=false, includeDeleted=false){
+  let list = (state[kind] || []).slice();
+  if(!includeArchived) list = list.filter(t => t.status !== 'archiviato');
+  if(!includeDeleted) list = list.filter(t => !t.deleted);
+  if(viewScope === 'mine' && state.currentUser) list = list.filter(t => t.section === state.currentUser.section);
+  if(filterSection) list = list.filter(t => t.section === filterSection);
+  if(filterUser){
+    list = list.filter(t => t.createdById === filterUser);
+  }
+  if(searchQuery){
+    const q = searchQuery.toLowerCase();
+    list = list.filter(t => (t.title||'').toLowerCase().includes(q));
+  }
+  return list;
+}
+
+/* =====================
+   Dashboard (Task only)
+===================== */
+function renderDashboard(){
+  const wrapper = document.createElement('div');
+  const cards = document.createElement('div'); cards.className='cards';
+
+  const tasks = visibleItems('tasks', false, false);
+  const today = todayISO();
+  const inScadenza = tasks.filter(t => t.status!=='archiviato' && ['da_fare','in_corso','in_visione_cu'].includes(t.status) && t.due && daysDiff(t.due, today) <= 3 && daysDiff(t.due, today) >= -365);
+  const completate = state.tasks.filter(t => !t.deleted && t.status==='completato');
+  const bloccanti = tasks.filter(t => t.priority==='Alta' && t.status!=='completato').length;
+
+  cards.appendChild(kpiCard('Totale attive (Task)', String(tasks.length)));
+  cards.appendChild(kpiCard('In scadenza (≤3gg)', String(inScadenza.length)));
+  cards.appendChild(kpiCard('Completate', String(completate.length)));
+  cards.appendChild(kpiCard('Priorità alta aperte', String(bloccanti)));
+
+  wrapper.appendChild(cards);
+
+  const box = document.createElement('div'); box.className='grid-2'; box.style.marginTop='16px';
+
+  const soon = document.createElement('div'); soon.className='kpi';
+  const h1 = document.createElement('h3'); h1.textContent = 'Scadenze imminenti';
+  soon.appendChild(h1);
+  const ul1 = document.createElement('div'); ul1.style.display='flex'; ul1.style.flexDirection='column'; ul1.style.gap='8px';
+  tasks.filter(t => t.due).sort(byDueAsc).slice(0,8).forEach(t => ul1.appendChild(itemRow(t)));
+  soon.appendChild(ul1);
+
+  const mine = document.createElement('div'); mine.className='kpi';
+  const h2 = document.createElement('h3'); h2.textContent = 'Ultime attività create';
+  mine.appendChild(h2);
+  const ul2 = document.createElement('div'); ul2.style.display='flex'; ul2.style.flexDirection='column'; ul2.style.gap='8px';
+  state.tasks.filter(t => !t.deleted).slice(-8).reverse().forEach(t => ul2.appendChild(itemRow(t)));
+  mine.appendChild(ul2);
+
+  box.appendChild(soon); box.appendChild(mine);
+  wrapper.appendChild(box);
+
+  mainEl.appendChild(wrapper);
+}
+
+function kpiCard(label, value){
+  const d = document.createElement('div'); d.className='kpi';
+  const l = document.createElement('div'); l.className='muted'; l.textContent = label;
+  const v = document.createElement('div'); v.className='val'; v.textContent = value;
+  d.appendChild(l); d.appendChild(v);
+  return d;
+}
+
+function itemRow(t){
+  const r = document.createElement('div'); r.className='meta';
+  const left = document.createElement('div');
+  const strong = document.createElement('strong'); strong.textContent = t.title;
+  const small = document.createElement('span'); small.className='muted'; small.textContent = ` • ${t.section} • ${t.priority}`;
+  left.appendChild(strong); left.appendChild(small);
+  const right = document.createElement('div'); right.className='muted';
+  right.textContent = t.due ? new Date(t.due + 'T00:00:00').toLocaleDateString() : '—';
+  r.appendChild(left); r.appendChild(right);
+  return r;
+}
+
+/* =====================
+   Kanban (Task & Appunti/Note)
+===================== */
+function renderBoard(kind){
+  // kind: 'tasks' | 'notes'
+  const isTask = kind === 'tasks';
+  const noun = isTask ? 'task' : 'appunto/nota';
+  const bar = document.createElement('div'); bar.className='toolbar';
+  const addBtn = document.createElement('button'); addBtn.className='btn primary'; addBtn.textContent = isTask ? 'Nuovo task' : 'Nuovo appunto/nota';
+  addBtn.onclick = () => isTask ? openTaskForm() : openNoteForm();
+  bar.appendChild(addBtn);
+  mainEl.appendChild(bar);
+
+  const wrap = document.createElement('div'); wrap.className='kanban';
+  const cols = [
+    { key:'da_fare', title:'Da fare' },
+    { key:'in_corso', title:'In corso' },
+    { key:'in_visione_cu', title:'In visione CU' },
+    { key:'completato', title:'Completato' }
+  ];
+  cols.forEach(col => {
+    const c = document.createElement('div'); c.className='col';
+    const count = document.createElement('span'); count.className='muted'; count.textContent = '0';
+    const hWrap = document.createElement('div'); hWrap.style.display='flex'; hWrap.style.justifyContent='space-between'; hWrap.style.alignItems='center';
+    const hTitle = document.createElement('span'); hTitle.textContent = col.title;
+    hWrap.appendChild(hTitle); hWrap.appendChild(count);
+    c.appendChild(hWrap);
+
+    const zone = document.createElement('div'); zone.className='dropzone'; zone.dataset.status = col.key;
+    const list = visibleItems(kind,false,false).filter(t => t.status === col.key).sort(byDueAsc);
+    count.textContent = String(list.length);
+    list.forEach(t => zone.appendChild(itemCard(t, kind)));
+    zone.ondragover = (e)=>{ e.preventDefault(); };
+    zone.ondrop = (e)=>{
+      e.preventDefault();
+      const id = e.dataTransfer.getData('text/plain');
+      const coll = state[kind];
+      const t = coll.find(x => x.id === id);
+      if(t){ t.status = col.key; saveState(); render(); }
+    };
+
+    c.appendChild(zone);
+    wrap.appendChild(c);
+  });
+
+  mainEl.appendChild(wrap);
+}
+
+function itemCard(t, kind){
+  const isTask = kind === 'tasks';
+  const card = document.createElement('div'); card.className='card'; card.draggable = true; card.tabIndex=0; card.setAttribute('role','button');
+  card.ondragstart = (e)=>{ e.dataTransfer.setData('text/plain', t.id); };
+
+  const top = document.createElement('div'); top.className='meta';
+  const secBadge = document.createElement('span'); secBadge.className='section-badge'; secBadge.textContent = t.section;
+  const idChip = document.createElement('span'); idChip.className='muted'; idChip.textContent = t.id.slice(-5);
+  top.appendChild(secBadge); top.appendChild(idChip);
+
+  const title = document.createElement('div'); title.style.fontWeight='600'; title.textContent = t.title;
+
+  const meta = document.createElement('div'); meta.className='meta';
+  const left = document.createElement('div');
+  const badge = document.createElement('span'); badge.className='badge'; badge.textContent = t.priority;
+  left.appendChild(badge);
+  const creator = document.createElement('span'); creator.className='muted'; creator.textContent = ' • ' + (t.createdBy || '—');
+  left.appendChild(creator);
+  const right = document.createElement('div'); right.className='muted';
+  if(t.due){
+    const d = daysDiff(t.due, todayISO());
+    const b = document.createElement('span'); b.className='badge';
+    if(d < 0){ b.classList.add('red'); b.textContent = 'Scaduto'; }
+    else if(d <= 3){ b.classList.add('amber'); b.textContent = `≤ ${d}g`; }
+    else { b.classList.add('green'); b.textContent = new Date(t.due+'T00:00:00').toLocaleDateString(); }
+    right.appendChild(b);
+  } else {
+    const dash = document.createElement('span'); dash.className='badge'; dash.textContent = '—'; right.appendChild(dash);
+  }
+  meta.appendChild(left); meta.appendChild(right);
+
+  const actions = document.createElement('div'); actions.className='meta';
+  const leftA = document.createElement('div');
+  const edit = document.createElement('button'); edit.className='btn small'; edit.textContent= isTask ? 'Modifica' : 'Modifica';
+  edit.onclick = (e)=>{ e.stopPropagation(); isTask ? openTaskForm(t) : openNoteForm(t); };
+  const archiveBtn = document.createElement('button'); archiveBtn.className='btn small'; archiveBtn.textContent= 'Archivia';
+  archiveBtn.setAttribute('aria-label', isTask ? 'Archivia task' : 'Archivia appunto/nota');
+  archiveBtn.onclick = (e)=>{ e.stopPropagation(); t.status='archiviato'; saveState(); render(); };
+  const del = document.createElement('button'); del.className='btn small danger'; del.textContent='Elimina';
+  del.onclick = (e)=>{ e.stopPropagation(); if(confirm('Eliminare definitivamente dalla vista?')){ t.deleted=true; saveState(); render(); } };
+  leftA.appendChild(edit); leftA.appendChild(archiveBtn); leftA.appendChild(del);
+  actions.appendChild(leftA);
+  const rightA = document.createElement('div'); rightA.className='muted'; rightA.textContent = isTask ? 'Task' : 'Appunto/Nota';
+  actions.appendChild(rightA);
+
+  card.appendChild(top);
+  card.appendChild(title);
+  card.appendChild(meta);
+  card.appendChild(actions);
+  return card;
+}
+
+function openTaskForm(existing=null){
+  const modal = document.createElement('div'); modal.className='modal-backdrop'; modal.role='dialog'; modal.ariaModal='true';
+  const box = document.createElement('div'); box.className='modal';
+  const title = document.createElement('h3'); title.textContent = existing ? 'Modifica task' : 'Nuovo task';
+  box.appendChild(title);
+
+  const fTitle = field('Titolo');
+  const fPriority = field('Priorità');
+  const fDue = field('Scadenza');
+  const fSection = field('Sezione');
+
+  const inputTitle = document.createElement('input'); inputTitle.className='input'; inputTitle.placeholder='Descrizione sintetica'; inputTitle.maxLength=120;
+  const selectPrio = document.createElement('select'); ['Alta','Media','Bassa'].forEach(p=>{ const o=document.createElement('option'); o.value=p; o.textContent=p; selectPrio.appendChild(o); });
+  const inputDue = document.createElement('input'); inputDue.type='date'; inputDue.className='input';
+  const selectSection = document.createElement('select'); state.sections.forEach(s=>{ const o=document.createElement('option'); o.value=s; o.textContent=s; selectSection.appendChild(o); });
+
+  fTitle.body.appendChild(inputTitle);
+  fPriority.body.appendChild(selectPrio);
+  fDue.body.appendChild(inputDue);
+  fSection.body.appendChild(selectSection);
+
+  if(existing){
+    inputTitle.value = existing.title;
+    selectPrio.value = existing.priority;
+    inputDue.value = existing.due || '';
+    selectSection.value = existing.section;
+  }else{ if(state.currentUser){ selectSection.value = state.currentUser.section; } }
+
+  box.appendChild(fTitle.wrap);
+  box.appendChild(fPriority.wrap);
+  box.appendChild(fDue.wrap);
+  box.appendChild(fSection.wrap);
+
+  const row = document.createElement('div'); row.className='row';
+  const saveBtn = document.createElement('button'); saveBtn.className='btn primary'; saveBtn.textContent='Salva';
+  const cancelBtn = document.createElement('button'); cancelBtn.className='btn'; cancelBtn.textContent='Annulla';
+
+  saveBtn.onclick = ()=>{
+    const t = existing || { id: uid('tsk'), status:'da_fare', createdBy: state.currentUser ? state.currentUser.name : 'sistema', createdById: state.currentUser ? state.currentUser.id : '', deleted:false };
+    t.title = (inputTitle.value||'').trim(); if(!t.title){ alert('Inserisci un titolo'); return; }
+    t.priority = selectPrio.value; t.due = inputDue.value || ''; t.section = selectSection.value;
+    if(!existing) state.tasks.push(t);
+    saveState(); modal.remove(); render();
+  };
+  cancelBtn.onclick = ()=> modal.remove();
+
+  row.appendChild(saveBtn); row.appendChild(cancelBtn);
+  box.appendChild(row);
+  modal.appendChild(box);
+  document.body.appendChild(modal);
+}
+
+function openNoteForm(existing=null){
+  const modal = document.createElement('div'); modal.className='modal-backdrop'; modal.role='dialog'; modal.ariaModal='true';
+  const box = document.createElement('div'); box.className='modal';
+  const title = document.createElement('h3'); title.textContent = existing ? 'Modifica appunto/nota' : 'Nuovo appunto/nota';
+  box.appendChild(title);
+
+  const fTitle = field('Titolo');
+  const fPriority = field('Priorità');
+  const fDue = field('Scadenza');
+  const fSection = field('Sezione');
+
+  const inputTitle = document.createElement('input'); inputTitle.className='input'; inputTitle.placeholder='Titolo sintetico'; inputTitle.maxLength=140;
+  const selectPrio = document.createElement('select'); ['Alta','Media','Bassa'].forEach(p=>{ const o=document.createElement('option'); o.value=p; o.textContent=p; selectPrio.appendChild(o); });
+  const inputDue = document.createElement('input'); inputDue.type='date'; inputDue.className='input';
+  const selectSection = document.createElement('select'); state.sections.forEach(s=>{ const o=document.createElement('option'); o.value=s; o.textContent=s; selectSection.appendChild(o); });
+
+  fTitle.body.appendChild(inputTitle);
+  fPriority.body.appendChild(selectPrio);
+  fDue.body.appendChild(inputDue);
+  fSection.body.appendChild(selectSection);
+
+  if(existing){ inputTitle.value = existing.title; selectPrio.value = existing.priority; inputDue.value = existing.due || ''; selectSection.value = existing.section; }
+  else if(state.currentUser){ selectSection.value = state.currentUser.section; }
+
+  const row = document.createElement('div'); row.className='row';
+  const saveBtn = document.createElement('button'); saveBtn.className='btn primary'; saveBtn.textContent='Salva';
+  const cancelBtn = document.createElement('button'); cancelBtn.className='btn'; cancelBtn.textContent='Annulla';
+
+  saveBtn.onclick = ()=>{
+    const n = existing || { id: uid('note'), status:'da_fare', createdBy: state.currentUser ? state.currentUser.name : 'sistema', createdById: state.currentUser ? state.currentUser.id : '', deleted:false };
+    n.title = (inputTitle.value||'').trim(); if(!n.title){ alert('Inserisci un titolo'); return; }
+    n.priority = selectPrio.value; n.due = inputDue.value || ''; n.section = selectSection.value;
+    if(!existing) state.notes.push(n);
+    saveState(); modal.remove(); render();
+  };
+  cancelBtn.onclick = ()=> modal.remove();
+
+  row.appendChild(saveBtn); row.appendChild(cancelBtn);
+  box.appendChild(fTitle.wrap); box.appendChild(fPriority.wrap); box.appendChild(fDue.wrap); box.appendChild(fSection.wrap);
+  box.appendChild(row);
+  modal.appendChild(box);
+  document.body.appendChild(modal);
+}
+
+function field(labelText){
+  const wrap = document.createElement('div'); wrap.className='field';
+  const label = document.createElement('label'); label.textContent = labelText;
+  const body = document.createElement('div');
+  wrap.appendChild(label); wrap.appendChild(body);
+  return { wrap, body };
+}
+
+/* =====================
+   Archivio & Cestino (Task)
+===================== */
+function renderArchive(){
+  const h = document.createElement('h3'); h.textContent = 'Archivio — Task';
+  mainEl.appendChild(h);
+  const rows = state.tasks.filter(t => t.status==='archiviato' && !t.deleted);
+  mainEl.appendChild(itemsTable(rows, 'tasks', { archive:false, trash:true, restore:true }));
+}
+function renderTrash(){
+  const h = document.createElement('h3'); h.textContent = 'Cestino — Task';
+  mainEl.appendChild(h);
+  const rows = state.tasks.filter(t => t.deleted);
+  mainEl.appendChild(itemsTable(rows, 'tasks', { purge:true, restore:true }));
+}
+
+function itemsTable(rows, kind, opts={}){
+  const t = document.createElement('table');
+  const thead = document.createElement('thead'); const trh = document.createElement('tr');
+  ['Titolo','Sezione','Priorità','Scadenza','Creato da','Azioni'].forEach(h => { const th=document.createElement('th'); th.textContent=h; trh.appendChild(th); });
+  thead.appendChild(trh);
+  const tb = document.createElement('tbody');
+  rows.sort(byDueAsc).forEach(r => {
+    const tr = document.createElement('tr');
+    const td1 = document.createElement('td'); td1.textContent = r.title; tr.appendChild(td1);
+    const td2 = document.createElement('td'); td2.textContent = r.section; tr.appendChild(td2);
+    const td3 = document.createElement('td'); td3.textContent = r.priority; tr.appendChild(td3);
+    const td4 = document.createElement('td'); td4.textContent = r.due ? new Date(r.due+'T00:00:00').toLocaleDateString() : '—'; tr.appendChild(td4);
+    const td5 = document.createElement('td'); td5.textContent = r.createdBy; tr.appendChild(td5);
+    const td6 = document.createElement('td');
+      if(opts.restore){
+        const res = document.createElement('button'); res.className='btn small'; res.textContent='Ripristina';
+        res.onclick = () => { r.deleted=false; if(r.status==='archiviato' && currentView==='trash') r.status='da_fare'; saveState(); render(); };
+        td6.appendChild(res);
+      }
+      if(opts.trash){
+        const toTrash = document.createElement('button'); toTrash.className='btn small danger'; toTrash.textContent='Elimina';
+        toTrash.onclick = ()=> { r.deleted=true; saveState(); render(); };
+        td6.appendChild(toTrash);
+      }
+      if(opts.purge){
+        const del = document.createElement('button'); del.className='btn small danger'; del.textContent='Elimina definitivamente';
+        del.onclick = ()=>{ if(confirm('Eliminare definitivamente?')){ state[kind] = state[kind].filter(x => x.id !== r.id); saveState(); render(); } };
+        td6.appendChild(del);
+      }
+    tr.appendChild(td6);
+    tb.appendChild(tr);
+  });
+  t.appendChild(thead); t.appendChild(tb);
+  return t;
+}
+
+/* =====================
+   Appointments (invariato)
+===================== */
+function renderAppointments(){
+  const bar = document.createElement('div'); bar.className='toolbar';
+  const add = document.createElement('button'); add.className='btn primary'; add.textContent='Nuovo appuntamento';
+  add.onclick = ()=> openAppointmentForm();
+  bar.appendChild(add);
+  mainEl.appendChild(bar);
+
+  const table = document.createElement('table');
+  const thead = document.createElement('thead'); const trh = document.createElement('tr');
+  ['Titolo','Data','Ora','Responsabile','Sezione','Conflitto','Azioni'].forEach(h => { const th=document.createElement('th'); th.textContent=h; trh.appendChild(th); });
+  thead.appendChild(trh);
+  const tb = document.createElement('tbody');
+  visibleAppointments(false).sort((a,b)=> (a.date+a.time).localeCompare(b.date+b.time)).forEach(a => {
+    const tr = document.createElement('tr');
+    const td1 = document.createElement('td'); td1.textContent = a.title; tr.appendChild(td1);
+    const td2 = document.createElement('td'); td2.textContent = a.date || '—'; tr.appendChild(td2);
+    const td3 = document.createElement('td'); td3.textContent = a.time || '—'; tr.appendChild(td3);
+    const u = state.users.find(u => u.id === a.responsibleUserId);
+    const td4 = document.createElement('td'); td4.textContent = u ? u.name : '—'; tr.appendChild(td4);
+    const td5 = document.createElement('td'); td5.textContent = a.section; tr.appendChild(td5);
+    const td6 = document.createElement('td'); const conf = hasConflict(a); td6.textContent = conf ? '⚠️' : ''; if(conf){ td6.title='Conflitto orario per responsabile'; } tr.appendChild(td6);
+    const td7 = document.createElement('td');
+      const edit = document.createElement('button'); edit.className='btn small'; edit.textContent='Modifica'; edit.onclick = ()=> openAppointmentForm(a);
+      const del = document.createElement('button'); del.className='btn small danger'; del.textContent='Elimina'; del.onclick = ()=>{ a.deleted=true; saveState(); render(); };
+      td7.appendChild(edit); td7.appendChild(del);
+    tr.appendChild(td7);
+    tb.appendChild(tr);
+  });
+  table.appendChild(thead); table.appendChild(tb);
+  mainEl.appendChild(table);
+}
+
+function visibleAppointments(includeDeleted=false){
+  let list = state.appointments.slice();
+  if(!includeDeleted) list = list.filter(a => !a.deleted);
+  if(viewScope === 'mine' && state.currentUser) list = list.filter(a => a.section === state.currentUser.section);
+  if(filterSection) list = list.filter(a => a.section === filterSection);
+  if(filterUser) list = list.filter(a => a.responsibleUserId === filterUser);
+  if(searchQuery){ const q = searchQuery.toLowerCase(); list = list.filter(a => a.title.toLowerCase().includes(q)); }
+  return list;
+}
+
+function hasConflict(a){
+  if(!a.date || !a.time || !a.responsibleUserId) return false;
+  return state.appointments.some(b => !b.deleted && b.id !== a.id && b.date === a.date && b.time === a.time && b.responsibleUserId === a.responsibleUserId);
+}
+
+function openAppointmentForm(existing=null){
+  if(state.users.length===0){ alert('Aggiungi prima almeno un utente.'); return; }
+  const modal = document.createElement('div'); modal.className='modal-backdrop';
+  const box = document.createElement('div'); box.className='modal';
+  const title = document.createElement('h3'); title.textContent = existing ? 'Modifica appuntamento' : 'Nuovo appuntamento'; box.appendChild(title);
+
+  const fTitle = field('Titolo');
+  const fDate = field('Data');
+  const fTime = field('Ora');
+  const fResp = field('Responsabile');
+  const fSection = field('Sezione');
+
+  const inputTitle = document.createElement('input'); inputTitle.className='input'; inputTitle.placeholder='Es. Briefing settimanale';
+  const inputDate = document.createElement('input'); inputDate.type='date'; inputDate.className='input';
+  const inputTime = document.createElement('input'); inputTime.type='time'; inputTime.className='input';
+  const selectUser = document.createElement('select'); state.users.forEach(u => { const o=document.createElement('option'); o.value=u.id; o.textContent = `${u.name} (${u.section})`; selectUser.appendChild(o); });
+  const selectSection = document.createElement('select'); state.sections.forEach(s=>{ const o=document.createElement('option'); o.value=s; o.textContent=s; selectSection.appendChild(o); });
+
+  fTitle.body.appendChild(inputTitle);
+  fDate.body.appendChild(inputDate);
+  fTime.body.appendChild(inputTime);
+  fResp.body.appendChild(selectUser);
+  fSection.body.appendChild(selectSection);
+
+  if(existing){ inputTitle.value = existing.title; inputDate.value = existing.date || ''; inputTime.value = existing.time || ''; selectUser.value = existing.responsibleUserId || ''; selectSection.value = existing.section || (state.currentUser?.section ?? state.sections[0]); }
+  else{ if(state.currentUser){ selectSection.value = state.currentUser.section; } }
+
+  const row = document.createElement('div'); row.className='row';
+  const saveBtn = document.createElement('button'); saveBtn.className='btn primary'; saveBtn.textContent='Salva';
+  const cancelBtn = document.createElement('button'); cancelBtn.className='btn'; cancelBtn.textContent='Annulla';
+
+  saveBtn.onclick = ()=>{
+    const a = existing || { id: uid('app'), deleted:false };
+    a.title = (inputTitle.value||'').trim(); if(!a.title){ alert('Inserisci un titolo'); return; }
+    a.date = inputDate.value || ''; a.time = inputTime.value || '';
+    a.responsibleUserId = selectUser.value; a.section = selectSection.value;
+    if(!existing) state.appointments.push(a);
+    saveState(); modal.remove(); render();
+  };
+  cancelBtn.onclick = ()=> modal.remove();
+
+  row.appendChild(saveBtn); row.appendChild(cancelBtn);
+  box.appendChild(fTitle.wrap); box.appendChild(fDate.wrap); box.appendChild(fTime.wrap); box.appendChild(fResp.wrap); box.appendChild(fSection.wrap);
+  box.appendChild(row);
+  modal.appendChild(box);
+  document.body.appendChild(modal);
+}
+
+/* =====================
+   Users & Sections
+===================== */
+function renderUsers(){
+  const bar = document.createElement('div'); bar.className='toolbar';
+  const add = document.createElement('button'); add.className='btn primary'; add.textContent='Nuovo utente'; add.onclick = ()=> openUserForm();
+  bar.appendChild(add); mainEl.appendChild(bar);
+
+  const table = document.createElement('table');
+  const thead = document.createElement('thead'); const trh = document.createElement('tr');
+  ['Nome','Sezione','Azioni'].forEach(h => { const th=document.createElement('th'); th.textContent=h; trh.appendChild(th); });
+  thead.appendChild(trh);
+  const tb = document.createElement('tbody');
+  state.users.forEach(u => {
+    const tr = document.createElement('tr');
+    const td1 = document.createElement('td'); td1.textContent = u.name; tr.appendChild(td1);
+    const td2 = document.createElement('td'); td2.textContent = u.section; tr.appendChild(td2);
+    const td3 = document.createElement('td');
+      const edit = document.createElement('button'); edit.className='btn small'; edit.textContent='Modifica'; edit.onclick = ()=> openUserForm(u);
+      const del = document.createElement('button'); del.className='btn small danger'; del.textContent='Elimina';
+      del.onclick = ()=>{ if(confirm('Eliminare utente?')){ state.appointments.forEach(a => { if(a.responsibleUserId===u.id) a.responsibleUserId=''; }); if(state.currentUser && state.currentUser.id===u.id) logout(); state.users = state.users.filter(x => x.id !== u.id); saveState(); render(); } };
+      td3.appendChild(edit); td3.appendChild(del);
+    tr.appendChild(td3); tb.appendChild(tr);
+  });
+  table.appendChild(thead); table.appendChild(tb); mainEl.appendChild(table);
+}
+
+function openUserForm(existing=null){
+  if(state.sections.length===0){ alert('Crea prima una sezione.'); return; }
+  const modal = document.createElement('div'); modal.className='modal-backdrop';
+  const box = document.createElement('div'); box.className='modal';
+  const title = document.createElement('h3'); title.textContent = existing ? 'Modifica utente' : 'Nuovo utente'; box.appendChild(title);
+
+  const fName = field('Nome');
+  const fSec = field('Sezione');
+  const input = document.createElement('input'); input.className='input'; input.placeholder='Es. Bianchi L.';
+  const sel = document.createElement('select'); state.sections.forEach(s => { const o=document.createElement('option'); o.value=s; o.textContent=s; sel.appendChild(o); });
+
+  fName.body.appendChild(input); fSec.body.appendChild(sel);
+  if(existing){ input.value=existing.name; sel.value=existing.section; }
+  else if(state.currentUser){ sel.value = state.currentUser.section; }
+
+  const row = document.createElement('div'); row.className='row';
+  const saveBtn = document.createElement('button'); saveBtn.className='btn primary'; saveBtn.textContent='Salva';
+  const cancelBtn = document.createElement('button'); cancelBtn.className='btn'; cancelBtn.textContent='Annulla';
+
+  saveBtn.onclick = ()=>{
+    const name = (input.value||'').trim(); if(!name){ alert('Inserisci un nome'); return; }
+    const section = sel.value;
+    if(existing){ existing.name = name; existing.section = section; if(state.currentUser && state.currentUser.id===existing.id){ state.currentUser.name = name; state.currentUser.section = section; } }
+    else { const nu = { id: uid('usr'), name, section }; state.users.push(nu); }
+    saveState(); modal.remove(); render();
+  };
+  cancelBtn.onclick = ()=> modal.remove();
+
+  row.appendChild(saveBtn); row.appendChild(cancelBtn);
+  box.appendChild(fName.wrap); box.appendChild(fSec.wrap); box.appendChild(row);
+  modal.appendChild(box); document.body.appendChild(modal);
+}
+
+function renderSections(){
+  const bar = document.createElement('div'); bar.className='toolbar';
+  const add = document.createElement('button'); add.className='btn primary'; add.textContent='Nuova sezione'; add.onclick = ()=> openSectionForm();
+  bar.appendChild(add); mainEl.appendChild(bar);
+
+  const table = document.createElement('table');
+  const thead = document.createElement('thead'); const trh = document.createElement('tr'); ['Nome sezione','Azioni'].forEach(h => { const th=document.createElement('th'); th.textContent=h; trh.appendChild(th); }); thead.appendChild(trh);
+  const tb = document.createElement('tbody');
+  state.sections.forEach(s => {
+    const tr = document.createElement('tr');
+    const td1 = document.createElement('td'); td1.textContent = s; tr.appendChild(td1);
+    const td2 = document.createElement('td');
+      const edit = document.createElement('button'); edit.className='btn small'; edit.textContent='Rinomina';
+      edit.onclick = ()=>{ const name = prompt('Nuovo nome sezione', s); if(name && name.trim()){ const newName = name.trim(); state.sections = state.sections.map(x => x===s ? newName : x); state.users.forEach(u => { if(u.section===s) u.section=newName; }); state.tasks.forEach(t => { if(t.section===s) t.section=newName; }); state.notes.forEach(n => { if(n.section===s) n.section=newName; }); state.appointments.forEach(a => { if(a.section===s) a.section=newName; }); if(state.currentUser && state.currentUser.section===s) state.currentUser.section = newName; saveState(); render(); } };
+      const del = document.createElement('button'); del.className='btn small danger'; del.textContent='Elimina'; del.onclick = ()=>{ if(confirm('Eliminare la sezione? Gli elementi resteranno ma andranno riassegnati manualmente.')){ state.sections = state.sections.filter(x => x!==s); saveState(); render(); } };
+      td2.appendChild(edit); td2.appendChild(del);
+    tr.appendChild(td2); tb.appendChild(tr);
+  });
+  table.appendChild(thead); table.appendChild(tb); mainEl.appendChild(table);
+}
+
+function openSectionForm(){
+  const name = prompt('Nome nuova sezione');
+  if(name && name.trim()){
+    const n = name.trim();
+    if(!state.sections.includes(n)){ state.sections.push(n); saveState(); render(); }
+    else alert('Sezione già esistente.');
+  }
+}
+
+/* =====================
+   Registro smarcamento Appunti/Note
+===================== */
+function renderRegistry(){
+  const bar = document.createElement('div'); bar.className='toolbar';
+  const add = document.createElement('button'); add.className='btn primary'; add.textContent='Nuovo documento'; add.onclick = ()=> openRegistryForm();
+  bar.appendChild(add);
+  mainEl.appendChild(bar);
+
+  const table = document.createElement('table');
+  const thead = document.createElement('thead'); const trh = document.createElement('tr');
+  ['Tipo doc.','Nr.','Data e Qual.','Uff. Competente','Argomento','Reparti in coord.','al SCSMM','Note','Azioni'].forEach(h => { const th=document.createElement('th'); th.textContent=h; trh.appendChild(th); });
+  thead.appendChild(trh);
+  const tb = document.createElement('tbody');
+
+  state.registry.filter(r=>!r.deleted).forEach(r => {
+    const tr = document.createElement('tr'); if(r.archived) tr.classList.add('archived-row');
+
+    const tdTipo = document.createElement('td'); tdTipo.textContent = r.tipoDoc; tr.appendChild(tdTipo);
+    const tdNr = document.createElement('td'); tdNr.textContent = r.nr || '—'; tr.appendChild(tdNr);
+    const tdDataQual = document.createElement('td'); tdDataQual.textContent = r.dataQual || '—'; tr.appendChild(tdDataQual);
+    const tdUff = document.createElement('td'); tdUff.textContent = r.uffCompetente || '—'; tr.appendChild(tdUff);
+    const tdArg = document.createElement('td'); tdArg.textContent = r.argomento || '—'; tr.appendChild(tdArg);
+
+    const tdRep = document.createElement('td');
+    tdRep.innerHTML = `<div><strong>con:</strong> ${escapeHtml(r.reparti.con||'—')}</div>
+                       <div><strong>invio:</strong> ${escapeHtml(r.reparti.invio||'—')}</div>
+                       <div><strong>rientro:</strong> ${escapeHtml(r.reparti.rientro||'—')}</div>`;
+    tr.appendChild(tdRep);
+
+    const tdScsmm = document.createElement('td');
+    tdScsmm.innerHTML = `<div><strong>invio:</strong> ${escapeHtml(r.scsmm.invio||'—')}</div>
+                         <div><strong>rientro:</strong> ${escapeHtml(r.scsmm.rientro||'—')}</div>`;
+    tr.appendChild(tdScsmm);
+
+    const tdNote = document.createElement('td'); tdNote.textContent = r.note || '—'; tr.appendChild(tdNote);
+
+    const tdAz = document.createElement('td');
+      const edit = document.createElement('button'); edit.className='btn small'; edit.textContent='Modifica'; edit.onclick = ()=> openRegistryForm(r);
+      const arch = document.createElement('button'); arch.className='btn small'; arch.textContent= r.archived ? 'Ripristina' : 'Archivia'; arch.onclick = ()=>{ r.archived = !r.archived; saveState(); render(); };
+      const del = document.createElement('button'); del.className='btn small danger'; del.textContent='Elimina'; del.onclick = ()=>{ if(confirm('Eliminare la riga?')){ r.deleted = true; saveState(); render(); } };
+      tdAz.appendChild(edit); tdAz.appendChild(arch); tdAz.appendChild(del);
+    tr.appendChild(tdAz);
+
+    tb.appendChild(tr);
+  });
+
+  table.appendChild(thead); table.appendChild(tb);
+  mainEl.appendChild(table);
+}
+
+function openRegistryForm(existing=null){
+  const modal = document.createElement('div'); modal.className='modal-backdrop';
+  const box = document.createElement('div'); box.className='modal';
+  const title = document.createElement('h3'); title.textContent = existing ? 'Modifica documento' : 'Nuovo documento'; box.appendChild(title);
+
+  const fTipo = field('Tipo doc.');
+  const fNr = field('Nr.');
+  const fDataQ = field('Data e Qual.');
+  const fUff = field('Uff. Competente');
+  const fArg = field('Argomento');
+  const fRep = field('Reparti in coord.');
+  const fSCSMM = field('al SCSMM');
+  const fNote = field('Note');
+
+  const selTipo = document.createElement('select'); ['PROM','APT','NOTA'].forEach(t => { const o=document.createElement('option'); o.value=t; o.textContent=t; selTipo.appendChild(o); });
+  const inNr = document.createElement('input'); inNr.className='input'; inNr.placeholder='Numero';
+  const inDataQ = document.createElement('input'); inDataQ.className='input'; inDataQ.placeholder='Es. 11/08/2025 - QL';
+  const inUff = document.createElement('input'); inUff.className='input'; inUff.placeholder='Ufficio competente';
+  const inArg = document.createElement('textarea'); inArg.placeholder='Oggetto/argomento…';
+
+  const repGrid = document.createElement('div'); repGrid.className='subgrid';
+  const repCon = document.createElement('input'); repCon.className='input'; repCon.placeholder='con';
+  const repInvio = document.createElement('input'); repInvio.className='input'; repInvio.placeholder='invio';
+  const repRientro = document.createElement('input'); repRientro.className='input'; repRientro.placeholder='rientro';
+  repGrid.appendChild(repCon); repGrid.appendChild(repInvio); repGrid.appendChild(repRientro);
+
+  const scsGrid = document.createElement('div'); scsGrid.className='subgrid';
+  const scsInvio = document.createElement('input'); scsInvio.className='input'; scsInvio.placeholder='invio';
+  const scsRientro = document.createElement('input'); scsRientro.className='input'; scsRientro.placeholder='rientro';
+  // add empty to align
+  const filler = document.createElement('div');
+  scsGrid.appendChild(scsInvio); scsGrid.appendChild(scsRientro); scsGrid.appendChild(filler);
+
+  const inNote = document.createElement('textarea'); inNote.placeholder='Note…';
+
+  fTipo.body.appendChild(selTipo); fNr.body.appendChild(inNr); fDataQ.body.appendChild(inDataQ); fUff.body.appendChild(inUff); fArg.body.appendChild(inArg);
+  fRep.body.appendChild(repGrid); fSCSMM.body.appendChild(scsGrid); fNote.body.appendChild(inNote);
+
+  if(existing){
+    selTipo.value = existing.tipoDoc; inNr.value = existing.nr||''; inDataQ.value = existing.dataQual||''; inUff.value = existing.uffCompetente||''; inArg.value = existing.argomento||'';
+    repCon.value = existing.reparti?.con||''; repInvio.value = existing.reparti?.invio||''; repRientro.value = existing.reparti?.rientro||'';
+    scsInvio.value = existing.scsmm?.invio||''; scsRientro.value = existing.scsmm?.rientro||'';
+    inNote.value = existing.note||'';
+  }
+
+  const row = document.createElement('div'); row.className='row';
+  const saveBtn = document.createElement('button'); saveBtn.className='btn primary'; saveBtn.textContent = 'Salva';
+  const cancelBtn = document.createElement('button'); cancelBtn.className='btn'; cancelBtn.textContent = 'Annulla';
+
+  saveBtn.onclick = ()=>{
+    const r = existing || { id: uid('reg'), archived:false, deleted:false };
+    r.tipoDoc = selTipo.value; r.nr = inNr.value.trim(); r.dataQual = inDataQ.value.trim(); r.uffCompetente = inUff.value.trim(); r.argomento = inArg.value.trim();
+    r.reparti = { con: repCon.value.trim(), invio: repInvio.value.trim(), rientro: repRientro.value.trim() };
+    r.scsmm = { invio: scsInvio.value.trim(), rientro: scsRientro.value.trim() };
+    r.note = inNote.value.trim();
+    if(!existing) state.registry.push(r);
+    saveState(); modal.remove(); render();
+  };
+  cancelBtn.onclick = ()=> modal.remove();
+
+  row.appendChild(saveBtn); row.appendChild(cancelBtn);
+  box.appendChild(fTipo.wrap); box.appendChild(fNr.wrap); box.appendChild(fDataQ.wrap); box.appendChild(fUff.wrap); box.appendChild(fArg.wrap); box.appendChild(fRep.wrap); box.appendChild(fSCSMM.wrap); box.appendChild(fNote.wrap); box.appendChild(row);
+  modal.appendChild(box); document.body.appendChild(modal);
+}
+
+function escapeHtml(str){
+  return String(str).replace(/[&<>"']/g, s => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;','\'':'&#39;'}[s]));
+}
+
+/* =====================
+   Login
+===================== */
+function showLogin(){
+  const modal = document.getElementById('loginModal');
+  const sel = document.getElementById('loginSection');
+  const name = document.getElementById('loginName');
+  clear(sel);
+  state.sections.forEach(s => { const o = document.createElement('option'); o.value=s; o.textContent=s; sel.appendChild(o); });
+  if(state.currentUser?.section && state.sections.includes(state.currentUser.section)) sel.value = state.currentUser.section;
+  else if(state.sections.length) sel.value = state.sections[0];
+  name.value = state.currentUser?.name || '';
+  modal.classList.remove('hidden');
+  name.focus();
+}
+function hideLogin(){ document.getElementById('loginModal').classList.add('hidden'); }
+function login(){
+  const name = document.getElementById('loginName').value.trim();
+  const section = document.getElementById('loginSection').value;
+  if(!name){ alert('Inserisci il nome'); return; }
+  let user = state.users.find(u => u.name === name && u.section === section);
+  if(!user){
+    user = { id: uid('usr'), name, section };
+    state.users.push(user);
+  }else{
+    user.name = name;
+    user.section = section;
+  }
+  state.currentUser = { id: user.id, name: user.name, section: user.section };
+  saveState();
+  hideLogin();
+  render();
+}
+function logout(){
+  state.currentUser = null;
+  persistLocalCache();
+  render();
+  showLogin();
+}
+
+/* =====================
+   CSV Export (Task)
+===================== */
+function exportCsv(){
+  const rows = [['ID','Titolo','Sezione','Priorità','Scadenza','Stato','Creato da','Eliminato']];
+  state.tasks.forEach(t => { rows.push([t.id, t.title, t.section, t.priority, t.due, t.status, t.createdBy, t.deleted ? '1':'0']); });
+  const csv = rows.map(r => r.map(v => `"${String(v).replace(/"/g,'""')}"`).join(',')).join('\n');
+  const blob = new Blob([csv], {type:'text/csv'});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a'); a.href = url; a.download = 'tasks.csv'; a.click();
+  URL.revokeObjectURL(url);
+}
+
+/* =====================
+   Wiring
+===================== */
+// search and filters
+ document.getElementById('searchInput').addEventListener('input', (e)=>{ searchQuery = e.target.value; render(); });
+ document.getElementById('sectionFilter').addEventListener('change', (e)=>{ filterSection = e.target.value; render(); });
+ document.getElementById('userFilter').addEventListener('change', (e)=>{ filterUser = e.target.value; render(); });
+ document.getElementById('viewMineBtn').addEventListener('click', ()=>{ viewScope='mine'; document.getElementById('viewMineBtn').classList.add('active'); document.getElementById('viewAllBtn').classList.remove('active'); render(); });
+ document.getElementById('viewAllBtn').addEventListener('click', ()=>{ viewScope='all'; document.getElementById('viewAllBtn').classList.add('active'); document.getElementById('viewMineBtn').classList.remove('active'); render(); });
+ document.getElementById('exportCsvBtn').addEventListener('click', exportCsv);
+
+ document.getElementById('logoutBtn').addEventListener('click', logout);
+ document.getElementById('loginBtn').addEventListener('click', login);
+ document.getElementById('addSectionBtn').addEventListener('click', ()=>{
+   const name = prompt('Nome nuova sezione');
+   if(name && name.trim()){
+     const n = name.trim();
+     if(!state.sections.includes(n)){
+       state.sections.push(n); saveState();
+       showLogin(); // refresh select in modal
+     }else alert('Sezione già esistente.');
+   }
+ });
+
+// Init
+async function bootstrap(){
+  loadStateFromLocal();
+  render();
+  if(!state.currentUser){ showLogin(); }
+  await initCloudSync();
+  render();
+}
+bootstrap();
+</script>
+</body>
+</html>
