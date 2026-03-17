@@ -145,8 +145,8 @@
     <h3>Menu</h3>
     <div class="menu">
       <button id="btnDashboard" class="active" onclick="switchView('dashboard')">📊 Dashboard</button>
-      <button id="btnBoardTask" onclick="switchView('boardTask')">🗂 Kanban — Task</button>
-      <button id="btnBoardNotes" onclick="switchView('boardNotes')">📝 Kanban — Appunti/Note</button>
+      <button id="btnBoardTask" onclick="switchView('boardTask')">🗂 Task</button>
+      <button id="btnBoardNotes" onclick="switchView('boardNotes')">📝 Appunti/Note</button>
       <button id="btnRegistry" onclick="switchView('registry')">📑 Registro smarcamento Appunti/Note</button>
       <button id="btnAppointments" onclick="switchView('appointments')">📅 Appuntamenti</button>
       <button id="btnArchive" onclick="switchView('archive')">📦 Archivio (Task)</button>
@@ -372,6 +372,7 @@ function normalizeState(data){
     title: '' + (a.title || ''),
     date: a.date || '',
     time: a.time || '',
+    place: a.place || '',
     responsibleUserId: a.responsibleUserId || '',
     section: a.section || safe.sections[0] || DEFAULT_SECTIONS[0],
     deleted: !!a.deleted
@@ -601,38 +602,122 @@ function visibleItems(kind, includeArchived=false, includeDeleted=false){
 ===================== */
 function renderDashboard(){
   const wrapper = document.createElement('div');
-  const cards = document.createElement('div'); cards.className='cards';
+  const cards = document.createElement('div'); 
+  cards.className='cards';
 
-  const tasks = visibleItems('tasks', false, false);
   const today = todayISO();
-  const inScadenza = tasks.filter(t => t.status!=='archiviato' && ['da_fare','in_corso','in_visione_cu'].includes(t.status) && t.due && daysDiff(t.due, today) <= 3 && daysDiff(t.due, today) >= -365);
-  const completate = state.tasks.filter(t => !t.deleted && t.status==='completato');
-  const bloccanti = tasks.filter(t => t.priority==='Alta' && t.status!=='completato').length;
 
-  cards.appendChild(kpiCard('Totale attive (Task)', String(tasks.length)));
-  cards.appendChild(kpiCard('In scadenza (≤3gg)', String(inScadenza.length)));
-  cards.appendChild(kpiCard('Completate', String(completate.length)));
-  cards.appendChild(kpiCard('Priorità alta aperte', String(bloccanti)));
+  const tasksOpen = visibleItems('tasks', false, false).filter(t => t.status !== 'completato');
+  const notesOpen = visibleItems('notes', false, false).filter(n => n.status !== 'completato');
+  const appointmentsOpen = visibleAppointments(false).filter(a => !a.date || a.date >= today);
+
+  cards.appendChild(kpiCard('Task attivi', String(tasksOpen.length)));
+  cards.appendChild(kpiCard('Appunti/Note aperti', String(notesOpen.length)));
+  cards.appendChild(kpiCard('Appuntamenti non scaduti', String(appointmentsOpen.length)));
+  cards.appendChild(kpiCard('Totale aperto/in corso', String(tasksOpen.length + notesOpen.length + appointmentsOpen.length)));
 
   wrapper.appendChild(cards);
 
-  const box = document.createElement('div'); box.className='grid-2'; box.style.marginTop='16px';
+  const box = document.createElement('div');
+  box.className='grid-2';
+  box.style.marginTop='16px';
 
-  const soon = document.createElement('div'); soon.className='kpi';
-  const h1 = document.createElement('h3'); h1.textContent = 'Scadenze imminenti';
+  const soon = document.createElement('div');
+  soon.className='kpi';
+  const h1 = document.createElement('h3');
+  h1.textContent = 'Attività aperte in evidenza';
   soon.appendChild(h1);
-  const ul1 = document.createElement('div'); ul1.style.display='flex'; ul1.style.flexDirection='column'; ul1.style.gap='8px';
-  tasks.filter(t => t.due).sort(byDueAsc).slice(0,8).forEach(t => ul1.appendChild(itemRow(t)));
+
+  const ul1 = document.createElement('div');
+  ul1.style.display='flex';
+  ul1.style.flexDirection='column';
+  ul1.style.gap='8px';
+
+  const openMixed = [
+    ...tasksOpen.map(t => ({ ...t, _tipo:'Task', _sortDate: t.due || '9999-12-31' })),
+    ...notesOpen.map(n => ({ ...n, _tipo:'Appunto/Nota', _sortDate: n.due || '9999-12-31' }))
+  ].sort((a,b) => a._sortDate.localeCompare(b._sortDate)).slice(0,8);
+
+  if(openMixed.length){
+    openMixed.forEach(item => {
+      const row = document.createElement('div'); row.className='meta';
+      const left = document.createElement('div');
+      const strong = document.createElement('strong');
+      strong.textContent = `${item._tipo}: ${item.title}`;
+      const small = document.createElement('span');
+      small.className='muted';
+      small.textContent = ` • ${item.section} • ${item.priority}`;
+      left.appendChild(strong);
+      left.appendChild(small);
+
+      const right = document.createElement('div');
+      right.className='muted';
+      right.textContent = item.due ? new Date(item.due + 'T00:00:00').toLocaleDateString() : '—';
+
+      row.appendChild(left);
+      row.appendChild(right);
+      ul1.appendChild(row);
+    });
+  } else {
+    const empty = document.createElement('div');
+    empty.className='muted';
+    empty.textContent = 'Nessun task o appunto aperto.';
+    ul1.appendChild(empty);
+  }
+
   soon.appendChild(ul1);
 
-  const mine = document.createElement('div'); mine.className='kpi';
-  const h2 = document.createElement('h3'); h2.textContent = 'Ultime attività create';
+  const mine = document.createElement('div');
+  mine.className='kpi';
+  const h2 = document.createElement('h3');
+  h2.textContent = 'Prossimi appuntamenti';
   mine.appendChild(h2);
-  const ul2 = document.createElement('div'); ul2.style.display='flex'; ul2.style.flexDirection='column'; ul2.style.gap='8px';
-  state.tasks.filter(t => !t.deleted).slice(-8).reverse().forEach(t => ul2.appendChild(itemRow(t)));
+
+  const ul2 = document.createElement('div');
+  ul2.style.display='flex';
+  ul2.style.flexDirection='column';
+  ul2.style.gap='8px';
+
+  const nextAppointments = appointmentsOpen
+    .slice()
+    .sort((a,b)=> (a.date + (a.time || '')).localeCompare(b.date + (b.time || '')))
+    .slice(0,8);
+
+  if(nextAppointments.length){
+    nextAppointments.forEach(a => {
+      const row = document.createElement('div'); row.className='meta';
+
+      const left = document.createElement('div');
+      const strong = document.createElement('strong');
+      strong.textContent = a.title;
+
+      const user = state.users.find(u => u.id === a.responsibleUserId);
+      const small = document.createElement('span');
+      small.className='muted';
+      small.textContent = ` • ${a.section} • ${user ? user.name : '—'}${a.place ? ' • ' + a.place : ''}`;
+
+      left.appendChild(strong);
+      left.appendChild(small);
+
+      const right = document.createElement('div');
+      right.className='muted';
+      right.textContent = `${a.date || '—'}${a.time ? ' • ' + a.time : ''}`;
+
+      row.appendChild(left);
+      row.appendChild(right);
+      ul2.appendChild(row);
+    });
+  } else {
+    const empty = document.createElement('div');
+    empty.className='muted';
+    empty.textContent = 'Nessun appuntamento non scaduto.';
+    ul2.appendChild(empty);
+  }
+
   mine.appendChild(ul2);
 
-  box.appendChild(soon); box.appendChild(mine);
+  box.appendChild(soon);
+  box.appendChild(mine);
   wrapper.appendChild(box);
 
   mainEl.appendChild(wrapper);
@@ -926,26 +1011,51 @@ function renderAppointments(){
 
   const table = document.createElement('table');
   const thead = document.createElement('thead'); const trh = document.createElement('tr');
-  ['Titolo','Data','Ora','Responsabile','Sezione','Conflitto','Azioni'].forEach(h => { const th=document.createElement('th'); th.textContent=h; trh.appendChild(th); });
+  ['Titolo','Data','Ora','Luogo','Responsabile','Sezione','Conflitto','Azioni'].forEach(h => {
+    const th=document.createElement('th'); th.textContent=h; trh.appendChild(th);
+  });
   thead.appendChild(trh);
+
   const tb = document.createElement('tbody');
   visibleAppointments(false).sort((a,b)=> (a.date+a.time).localeCompare(b.date+b.time)).forEach(a => {
     const tr = document.createElement('tr');
+
     const td1 = document.createElement('td'); td1.textContent = a.title; tr.appendChild(td1);
     const td2 = document.createElement('td'); td2.textContent = a.date || '—'; tr.appendChild(td2);
     const td3 = document.createElement('td'); td3.textContent = a.time || '—'; tr.appendChild(td3);
+    const td4 = document.createElement('td'); td4.textContent = a.place || '—'; tr.appendChild(td4);
+
     const u = state.users.find(u => u.id === a.responsibleUserId);
-    const td4 = document.createElement('td'); td4.textContent = u ? u.name : '—'; tr.appendChild(td4);
-    const td5 = document.createElement('td'); td5.textContent = a.section; tr.appendChild(td5);
-    const td6 = document.createElement('td'); const conf = hasConflict(a); td6.textContent = conf ? '⚠️' : ''; if(conf){ td6.title='Conflitto orario per responsabile'; } tr.appendChild(td6);
+    const td5 = document.createElement('td'); td5.textContent = u ? u.name : '—'; tr.appendChild(td5);
+
+    const td6 = document.createElement('td'); td6.textContent = a.section; tr.appendChild(td6);
+
     const td7 = document.createElement('td');
-      const edit = document.createElement('button'); edit.className='btn small'; edit.textContent='Modifica'; edit.onclick = ()=> openAppointmentForm(a);
-      const del = document.createElement('button'); del.className='btn small danger'; del.textContent='Elimina'; del.onclick = ()=>{ a.deleted=true; saveState(); render(); };
-      td7.appendChild(edit); td7.appendChild(del);
+    const conf = hasConflict(a);
+    td7.textContent = conf ? '⚠️' : '';
+    if(conf) td7.title='Conflitto orario per responsabile';
     tr.appendChild(td7);
+
+    const td8 = document.createElement('td');
+    const edit = document.createElement('button');
+    edit.className='btn small';
+    edit.textContent='Modifica';
+    edit.onclick = ()=> openAppointmentForm(a);
+
+    const del = document.createElement('button');
+    del.className='btn small danger';
+    del.textContent='Elimina';
+    del.onclick = ()=>{ a.deleted=true; saveState(); render(); };
+
+    td8.appendChild(edit);
+    td8.appendChild(del);
+    tr.appendChild(td8);
+
     tb.appendChild(tr);
   });
-  table.appendChild(thead); table.appendChild(tb);
+
+  table.appendChild(thead);
+  table.appendChild(tb);
   mainEl.appendChild(table);
 }
 
@@ -966,30 +1076,69 @@ function hasConflict(a){
 
 function openAppointmentForm(existing=null){
   if(state.users.length===0){ alert('Aggiungi prima almeno un utente.'); return; }
+
   const modal = document.createElement('div'); modal.className='modal-backdrop';
   const box = document.createElement('div'); box.className='modal';
-  const title = document.createElement('h3'); title.textContent = existing ? 'Modifica appuntamento' : 'Nuovo appuntamento'; box.appendChild(title);
+  const title = document.createElement('h3');
+  title.textContent = existing ? 'Modifica appuntamento' : 'Nuovo appuntamento';
+  box.appendChild(title);
 
   const fTitle = field('Titolo');
   const fDate = field('Data');
   const fTime = field('Ora');
   const fResp = field('Responsabile');
   const fSection = field('Sezione');
+  const fPlace = field('Luogo');
 
-  const inputTitle = document.createElement('input'); inputTitle.className='input'; inputTitle.placeholder='Es. Briefing settimanale';
-  const inputDate = document.createElement('input'); inputDate.type='date'; inputDate.className='input';
-  const inputTime = document.createElement('input'); inputTime.type='time'; inputTime.className='input';
-  const selectUser = document.createElement('select'); state.users.forEach(u => { const o=document.createElement('option'); o.value=u.id; o.textContent = `${u.name} (${u.section})`; selectUser.appendChild(o); });
-  const selectSection = document.createElement('select'); state.sections.forEach(s=>{ const o=document.createElement('option'); o.value=s; o.textContent=s; selectSection.appendChild(o); });
+  const inputTitle = document.createElement('input');
+  inputTitle.className='input';
+  inputTitle.placeholder='Es. Briefing settimanale';
+
+  const inputDate = document.createElement('input');
+  inputDate.type='date';
+  inputDate.className='input';
+
+  const inputTime = document.createElement('input');
+  inputTime.type='time';
+  inputTime.className='input';
+
+  const selectUser = document.createElement('select');
+  state.users.forEach(u => {
+    const o=document.createElement('option');
+    o.value=u.id;
+    o.textContent = `${u.name} (${u.section})`;
+    selectUser.appendChild(o);
+  });
+
+  const selectSection = document.createElement('select');
+  state.sections.forEach(s=>{
+    const o=document.createElement('option');
+    o.value=s;
+    o.textContent=s;
+    selectSection.appendChild(o);
+  });
+
+  const inputPlace = document.createElement('input');
+  inputPlace.className='input';
+  inputPlace.placeholder='Es. Sala briefing';
 
   fTitle.body.appendChild(inputTitle);
   fDate.body.appendChild(inputDate);
   fTime.body.appendChild(inputTime);
   fResp.body.appendChild(selectUser);
   fSection.body.appendChild(selectSection);
+  fPlace.body.appendChild(inputPlace);
 
-  if(existing){ inputTitle.value = existing.title; inputDate.value = existing.date || ''; inputTime.value = existing.time || ''; selectUser.value = existing.responsibleUserId || ''; selectSection.value = existing.section || (state.currentUser?.section ?? state.sections[0]); }
-  else{ if(state.currentUser){ selectSection.value = state.currentUser.section; } }
+  if(existing){
+    inputTitle.value = existing.title;
+    inputDate.value = existing.date || '';
+    inputTime.value = existing.time || '';
+    selectUser.value = existing.responsibleUserId || '';
+    selectSection.value = existing.section || (state.currentUser?.section ?? state.sections[0]);
+    inputPlace.value = existing.place || '';
+  }else{
+    if(state.currentUser){ selectSection.value = state.currentUser.section; }
+  }
 
   const row = document.createElement('div'); row.className='row';
   const saveBtn = document.createElement('button'); saveBtn.className='btn primary'; saveBtn.textContent='Salva';
@@ -997,17 +1146,34 @@ function openAppointmentForm(existing=null){
 
   saveBtn.onclick = ()=>{
     const a = existing || { id: uid('app'), deleted:false };
-    a.title = (inputTitle.value||'').trim(); if(!a.title){ alert('Inserisci un titolo'); return; }
-    a.date = inputDate.value || ''; a.time = inputTime.value || '';
-    a.responsibleUserId = selectUser.value; a.section = selectSection.value;
+    a.title = (inputTitle.value||'').trim();
+    if(!a.title){ alert('Inserisci un titolo'); return; }
+
+    a.date = inputDate.value || '';
+    a.time = inputTime.value || '';
+    a.responsibleUserId = selectUser.value;
+    a.section = selectSection.value;
+    a.place = (inputPlace.value || '').trim();
+
     if(!existing) state.appointments.push(a);
-    saveState(); modal.remove(); render();
+    saveState();
+    modal.remove();
+    render();
   };
+
   cancelBtn.onclick = ()=> modal.remove();
 
-  row.appendChild(saveBtn); row.appendChild(cancelBtn);
-  box.appendChild(fTitle.wrap); box.appendChild(fDate.wrap); box.appendChild(fTime.wrap); box.appendChild(fResp.wrap); box.appendChild(fSection.wrap);
+  row.appendChild(saveBtn);
+  row.appendChild(cancelBtn);
+
+  box.appendChild(fTitle.wrap);
+  box.appendChild(fDate.wrap);
+  box.appendChild(fTime.wrap);
+  box.appendChild(fResp.wrap);
+  box.appendChild(fSection.wrap);
+  box.appendChild(fPlace.wrap);
   box.appendChild(row);
+
   modal.appendChild(box);
   document.body.appendChild(modal);
 }
